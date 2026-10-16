@@ -5,14 +5,29 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Transcript Racer</title>
         <link rel="stylesheet" href="style.css">
-        <script src="app.js"></script>
+        <script src="app.js" defer></script>
     </head>
     <body>
         <section id="setup">
             <h2>setup</h2>
-            <textarea id="setuptext" name="setuptext" rows="8" cols="80">
-                big textarea
-            </textarea>
+            <textarea id="source" rows="8" cols="80" placeholder="Paste a transcript here..."></textarea>
+            <p id="summary"></p>
+            <label>
+                <input type="checkbox" id="fillers" checked>
+                Remove filler words (um, uh, erm)
+            </label>
+            <label>
+                Sentences per section
+                <select id="perSection">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3" selected>3</option>
+                    <option value="4">4</option>
+                    <option value="6">6</option>
+                </select>
+            </label>
+            <h3>First section preview</h3>
+            <p id="preview"></p>
             <button id="startBtn">Start</button>
         </section>
         <section id="play">
