@@ -1,6 +1,6 @@
 # How Transcript Racer works
 
-This file explains the code one phase at a time, in plain English. Phases 1–4 (screens, cleaning and sectioning) are summarised in the README.
+This file explains the code one phase at a time, in plain English. Phases 1–4 (screens, cleaning and sectioning) are summarised in the README's "How it works" section.
 
 ## Phase 5: Typing core
 
@@ -265,3 +265,41 @@ A **CSS variable** (custom property) is a named value you define once and reuse:
 When the computer is set to dark mode, the browser uses the second set of values. Because `.card` still says `var(--ink)`, it picks up the dark value automatically. None of the component rules are written twice. Adding a new component means using the existing variables, and it works in both themes for free.
 
 The mode colours work the same way. `--mode` is a variable, and `body[data-mode="recall"]` sets it to `var(--blue)`. Variables pass down to child elements, so every button, dot and car inside the body turns blue.
+
+## Phase 11: Ship it
+
+### Ready for a static host
+
+A static host (like GitHub Pages) just sends your files to the browser as they are, so the app needs no server code. The only thing that matters is the paths. `index.html` loads `style.css` and `app.js` with **relative** paths (`href="style.css"`, not `C:\...` or `/style.css`), so they're found next to `index.html` wherever the folder ends up, including a sub-path like `/transcript-racer/`. The only full URL is Google Fonts, which is `https://` and works from any site. If the fonts can't load, the fallback fonts take over.
+
+### Putting it on GitHub Pages
+
+You do this part. It's a repo setting, and it's quick:
+
+1. **Push your commits** so GitHub has the latest code. In the VS Code terminal (PowerShell):
+   ```powershell
+   git push
+   ```
+2. Open **https://github.com/Scereweir61/transcript-racer** in your browser.
+3. Click **Settings** (the gear tab along the top of the repo).
+4. In the left sidebar, under **Code and automation**, click **Pages**.
+5. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
+6. Under **Branch**, choose **main** and the folder **/ (root)**, then click **Save**.
+7. Wait a minute or two, then refresh the Pages settings. A box at the top will say **"Your site is live at https://scereweir61.github.io/transcript-racer/"**.
+8. Open that link and test it: load the sample and play a section in each mode.
+9. Optional: on the repo's main page, click the gear next to **About** and tick **Use your GitHub Pages website**, so the link shows at the top of the repo.
+
+From then on, every `git push` to `main` updates the live site automatically (allow a minute). On a free account the repository has to be **public** for Pages to work. If the page shows a 404 at first, wait a couple of minutes, because the first deploy can be slow. You can follow its progress in the repo's **Actions** tab.
+
+### README
+
+`README.md` was rewritten for visitors and recruiters. It has a one-line pitch, the live link, a screenshot placeholder, features, how it works (cleaning, sectioning, scoring and LCS), tech used, challenges and how they were solved, known limitations, and what's next. Replace the screenshot placeholder with a real image or GIF when you can: a short screen recording of a race in each mode is ideal.
+
+### CV bullet points
+
+These only describe things the app really does:
+
+- Built **Transcript Racer**, a browser-based study tool in vanilla HTML, CSS and JavaScript (no frameworks or build tools) that turns lecture transcripts into typing drills with three study modes: copy, fill-the-blanks and timed recall.
+- Wrote a **regex text-processing pipeline** that strips caption timestamps, tags and filler words, normalises un-typeable Unicode characters, and splits text into sections, with a fallback for unpunctuated auto-generated captions.
+- Implemented a **longest-common-subsequence (dynamic programming) algorithm** to score free-recall answers by word order, plus a weighted random selector that picks key terms to blank out, and fair WPM/accuracy metrics based on keystrokes and total time.
+- Designed a **responsive, accessible UI** with CSS custom-property theming (automatic dark mode), reduced-motion support, keyboard controls and `localStorage` persistence, and deployed it as a static site on **GitHub Pages**.
