@@ -5,8 +5,13 @@ Input transcript then have to type up the transcripts in a typeracer style game,
 - [x] Screens: setup, play and done, switched with `show()`
 - [x] Cleaning: removes timestamps, `[Music]`-style tags, filler words (optional) and hard-to-type characters
 - [x] Sections: splits the cleaned text into sentences and groups them into sections
-- [ ] Typing game
+- [x] Typing game: per-letter colouring, blinking caret, paste blocked, restart and skip
 - [ ] WPM and accuracy
+- [ ] Session summary and saving
+- [ ] Fill-the-blanks mode
+- [ ] Recall mode
+- [ ] Make it look good
+- [ ] Ship it
 
 ## How it works so far
 1. **Cleaning** (`cleanTranscript`) runs a series of regex find-and-replace steps on the pasted text and counts what each step removed.

@@ -1,0 +1,50 @@
+:root {
+    --untyped: #8a8a8a;
+    --ok: #1f7a3a;
+    --bad: #c62828;
+    --bad-bg: #fde0e0;
+    --accent: #2563eb;
+}
+
+/* a <section> with the hidden property must stay hidden, whatever else says */
+[hidden] {
+    display: none !important;
+}
+
+#passage {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 1.25rem;
+    line-height: 1.8;
+    color: var(--untyped);
+    white-space: pre-wrap;
+    cursor: text;
+}
+
+#passage .ok {
+    color: var(--ok);
+}
+
+/* the background makes a wrongly typed space visible */
+#passage .bad {
+    color: var(--bad);
+    background: var(--bad-bg);
+}
+
+/* the caret: a thin line drawn on the left edge of the next letter.
+   It only adds a shadow, so the letter keeps its grey colour. */
+#passage .cur {
+    box-shadow: inset 2px 0 0 var(--accent);
+    animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+    50% {
+        box-shadow: none;
+    }
+}
+
+#typeBox {
+    width: 100%;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 1rem;
+}
