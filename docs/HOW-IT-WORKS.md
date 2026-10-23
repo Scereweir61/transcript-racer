@@ -72,3 +72,36 @@ Backspacing makes the typed text shorter, so the letter you deleted falls into r
 **Why ÷ 5:** words are different lengths. "a" and "mitochondria" would both count as one word, so a passage full of short words would look faster. Typing tests agree that a "word" is any 5 characters, spaces and punctuation included. That way 100 correct characters is always 20 words, whatever the text. 100 characters in 30 seconds is 20 words in 0.5 minutes, which is 40 WPM.
 
 **Why keystrokes, not the final text:** you can't finish a section until the text is perfect, so the final text is always 100% correct. Comparing it with the target would tell us nothing. Instead we count every new character as it's typed. If you type a wrong letter, backspace and fix it, that's 2 keystrokes and 1 error, so the mistake still shows in your accuracy. Only characters beyond the previous length count, so deleting doesn't add keystrokes.
+
+## Phase 7: Session summary and saving
+
+### What was added
+
+- **Setup screen:** Load sample and Clear buttons. On a first visit the sample lecture is loaded automatically.
+- **Done screen:** totals (overall WPM, average score, sections completed), a table of results, and three buttons: Practise weakest sections, Do it all again, and Change transcript or mode.
+- **Saving:** the transcript box is saved to `localStorage` as you type, so a reload keeps it. (The chosen mode will also be saved from Phase 8, when the mode picker exists.)
+
+### The new state
+
+- `results` is an object keyed by section number, e.g. `results[2] = { wpm: 54, score: 97, ms: 41000, chars: 230, attempts: 1 }`. `startRun` empties it, so each run has its own summary.
+- `runMode` is the study mode for this run. For now it is always `'copy'`, where the score is the accuracy.
+
+### The new functions
+
+- `recordResult(index, result)` stores a finished section's result. A retry replaces the old one but adds 1 to `attempts`.
+- `showSummary()` stops the timer, fills in the done screen and shows it. It runs after the last section and from End session.
+- `completedSections()` lists the section numbers that have a result. A skipped section never calls `recordResult`, so it never shows up in the table.
+- `weakLimit()` returns 92 in Copy mode and 80 in the other modes. A score below this gets a "weak" pill.
+- `renderSummary()` adds up characters, time and scores while building one table row per completed section.
+- `makeResultRow(index, result)` and `makeCell(text)` build the table with `createElement` and `textContent`. Using `textContent` (not `innerHTML`) means a transcript containing something like `<script>` is shown as text and never run.
+- `weaknessRank(result)` is `score × 2 + wpm ÷ 2`. Lower means weaker. Score is doubled because getting it right matters more than speed.
+- `weakestSections()` sorts the completed sections by that rank, keeps the bottom third (`Math.round(count ÷ 3)`, at least 1), and puts them back in their original order. Practise weakest sections calls `startRun` with that list.
+- `loadSaved(key)` and `save(key, value)` wrap `localStorage` in `try/catch`. Some browsers block storage (for example in some private modes), and then `localStorage` throws an error. Catching it means the app keeps working and simply doesn't remember.
+- `setTranscript(text)` puts text in the box, saves it and re-sections it. Load sample and Clear both use it.
+- `restoreTranscript()` runs at startup. If nothing was ever saved (`null`), it loads the sample. If an empty string was saved, the user cleared the box on purpose, so it stays empty.
+
+The snippet column uses CSS to stay on one line: `white-space: nowrap` stops wrapping, `overflow: hidden` hides the rest, and `text-overflow: ellipsis` adds the "...". `table-layout: fixed` is needed so the column shrinks instead of stretching the table.
+
+### Explain it: why total characters ÷ total time is fairer than averaging WPMs
+
+Say you type a short 50-character section in 10 seconds (60 WPM) and a long 500-character section in 200 seconds (30 WPM). The average of the two WPMs is 45, but that treats a 10-second sprint as equal to over three minutes of typing. Overall you typed 550 characters in 210 seconds, which is (550 ÷ 5) ÷ 3.5 minutes ≈ 31 WPM. That's your real speed across the session. Adding up all the characters and all the time weights each section by how much typing it actually took, so short sections can't inflate the result.

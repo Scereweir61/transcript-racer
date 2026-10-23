@@ -22,6 +22,60 @@ const resultNote = document.getElementById('resultNote');
 const nextBtn = document.getElementById('nextBtn');
 const retryBtn = document.getElementById('retryBtn');
 const endBtn = document.getElementById('endBtn');
+const sampleBtn = document.getElementById('sampleBtn');
+const clearBtn = document.getElementById('clearBtn');
+const totalWpm = document.getElementById('totalWpm');
+const totalScore = document.getElementById('totalScore');
+const totalDone = document.getElementById('totalDone');
+const resultsTable = document.getElementById('resultsTable');
+const resultsBody = document.getElementById('resultsBody');
+const noResults = document.getElementById('noResults');
+const weakestBtn = document.getElementById('weakestBtn');
+const againBtn = document.getElementById('againBtn');
+const changeBtn = document.getElementById('changeBtn');
+
+// the names the app saves things under in localStorage
+const SOURCE_KEY = 'transcriptRacer.source';
+
+// the example lecture used by "Load sample" and on a first visit
+const SAMPLE_TRANSCRIPT = `0:00
+[Music]
+0:03
+okay so today we're going to talk about um the mitochondria and what it
+0:07
+actually does. Most people remember it as the powerhouse of the cell,
+0:11
+but that phrase hides the interesting part. [Applause]
+0:15
+The mitochondria turns the energy stored in glucose into ATP, which is
+0:19
+the molecule your cells actually spend. This happens in a process
+0:23
+called cellular respiration, and uh it has three main stages.
+0:28
+The first stage is glycolysis, and it happens in the cytoplasm, outside
+0:32
+the mitochondria. It splits one glucose molecule into two molecules of
+0:36
+pyruvate and gives a small amount of ATP.
+0:40
+The second stage is the Krebs cycle, which takes place in the matrix,
+0:44
+the fluid inside the mitochondria. It releases carbon dioxide and loads
+0:48
+up carrier molecules called NADH and FADH2.
+0:52
+The third stage is the electron transport chain on the inner membrane.
+0:57
+This is where most of the ATP is made, around thirty to thirty-two
+1:01
+molecules per glucose. Oxygen is the final electron acceptor, which is
+1:05
+um why you need to breathe. Without oxygen, the chain stops.
+1:10
+(laughter) So next time someone says powerhouse of the cell, you can
+1:14
+tell them exactly how the power gets made.`;
 
 // the current list of sections, made from the cleaned transcript
 let sections = [];
@@ -39,6 +93,12 @@ let statsTimer = null;
 // the result of the section just finished, and of the attempt before a retry
 let lastResult = null;
 let previousAttempt = null;
+
+// results for this run, keyed by section number: { wpm, score, ms, chars, attempts }
+let results = {};
+
+// the study mode for this run (only 'copy' for now)
+let runMode = 'copy';
 
 function show(view) {
     const screens = document.querySelectorAll("section");
@@ -131,6 +191,8 @@ function update() {
 function startRun(sectionNumbers) {
     order = sectionNumbers;
     pos = 0;
+    results = {};
+    previousAttempt = null;
     show('play');
     loadSection();
 }
@@ -300,12 +362,32 @@ function finishSection() {
     typeBox.disabled = true;
 
     const ms = elapsedMs();
+    const accuracy = calcAccuracy();
     lastResult = {
         wpm: calcWpm(cur.target.length, ms),
-        accuracy: calcAccuracy(),
-        ms: ms
+        accuracy: accuracy,
+        score: accuracy,   // in Copy mode, the main score is accuracy
+        ms: ms,
+        chars: cur.target.length
     };
+    recordResult(cur.index, lastResult);
     showResult(lastResult);
+}
+
+// Save a section's result for the summary. A retry replaces the old
+// result but keeps counting the attempts.
+function recordResult(index, result) {
+    let attempts = 1;
+    if (results[index] !== undefined) {
+        attempts = results[index].attempts + 1;
+    }
+    results[index] = {
+        wpm: result.wpm,
+        score: result.score,
+        ms: result.ms,
+        chars: result.chars,
+        attempts: attempts
+    };
 }
 
 // Swap the typing area for the result panel and fill it in.
@@ -382,7 +464,148 @@ function nextSection() {
     if (pos < order.length) {
         loadSection();
     } else {
-        show('done');
+        showSummary();
+    }
+}
+
+// Finish the run: stop the clock, fill in the summary and show the done screen.
+function showSummary() {
+    stopTimer();
+    renderSummary();
+    show('done');
+}
+
+// The section numbers that have a result, smallest first.
+// Skipped sections never get a result, so they aren't included.
+function completedSections() {
+    const done = [];
+    for (const index of order) {
+        if (results[index] !== undefined) done.push(index);
+    }
+    return done.sort((a, b) => a - b);
+}
+
+// The score below which a section counts as weak. Copying is easier,
+// so the bar is higher there.
+function weakLimit() {
+    if (runMode === 'copy') return 92;
+    return 80;
+}
+
+// Fill in the totals and the table on the done screen.
+function renderSummary() {
+    const done = completedSections();
+    let totalChars = 0;
+    let totalMs = 0;
+    let scoreSum = 0;
+    resultsBody.textContent = '';
+
+    for (const index of done) {
+        const result = results[index];
+        totalChars += result.chars;
+        totalMs += result.ms;
+        scoreSum += result.score;
+        resultsBody.appendChild(makeResultRow(index, result));
+    }
+
+    // overall WPM comes from all the characters over all the time,
+    // not from averaging each section's WPM
+    totalWpm.textContent = calcWpm(totalChars, totalMs);
+    if (done.length > 0) {
+        totalScore.textContent = Math.round(scoreSum / done.length) + '%';
+    } else {
+        totalScore.textContent = '-';
+    }
+    totalDone.textContent = `${done.length} of ${order.length}`;
+
+    resultsTable.hidden = done.length === 0;
+    noResults.hidden = done.length > 0;
+    weakestBtn.disabled = done.length === 0;
+}
+
+// Build one table row: section number, a one-line snippet, WPM and score,
+// with a "weak" pill if the score is under the limit.
+function makeResultRow(index, result) {
+    const row = document.createElement('tr');
+    row.appendChild(makeCell(index + 1));
+
+    // CSS cuts the snippet to one line with an ellipsis (...)
+    const snippet = makeCell(sections[index]);
+    snippet.className = 'snippet';
+    row.appendChild(snippet);
+
+    row.appendChild(makeCell(result.wpm));
+
+    const scoreCell = makeCell(result.score + '%');
+    if (result.score < weakLimit()) {
+        const pill = document.createElement('span');
+        pill.className = 'pill';
+        pill.textContent = 'weak';
+        scoreCell.appendChild(pill);
+    }
+    row.appendChild(scoreCell);
+    return row;
+}
+
+// Make a table cell holding some text. Using textContent (not innerHTML)
+// means text from the transcript can never be treated as HTML.
+function makeCell(text) {
+    const cell = document.createElement('td');
+    cell.textContent = text;
+    return cell;
+}
+
+// A section's place in the weakest ranking: lower means weaker.
+// Score counts for more than speed, because getting it right matters most.
+function weaknessRank(result) {
+    return result.score * 2 + result.wpm / 2;
+}
+
+// Pick the weakest third of completed sections (at least one),
+// returned in their original order.
+function weakestSections() {
+    const done = completedSections();
+    done.sort((a, b) => weaknessRank(results[a]) - weaknessRank(results[b]));
+
+    const howMany = Math.max(1, Math.round(done.length / 3));
+    const weakest = done.slice(0, howMany);
+    return weakest.sort((a, b) => a - b);
+}
+
+// Read a saved value, or null if there isn't one or storage is blocked.
+function loadSaved(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch (error) {
+        return null;
+    }
+}
+
+// Save a value. If storage is blocked (e.g. some private modes), carry on
+// without saving rather than crashing.
+function save(key, value) {
+    try {
+        localStorage.setItem(key, value);
+    } catch (error) {
+        // nothing to do: the app works, it just won't remember
+    }
+}
+
+// Put text in the transcript box, save it and re-section it.
+function setTranscript(text) {
+    source.value = text;
+    save(SOURCE_KEY, text);
+    update();
+}
+
+// Fill the transcript box with the saved transcript, or the sample on a
+// first visit. A saved empty string means the user cleared it, so keep it empty.
+function restoreTranscript() {
+    const saved = loadSaved(SOURCE_KEY);
+    if (saved === null) {
+        source.value = SAMPLE_TRANSCRIPT;
+    } else {
+        source.value = saved;
     }
 }
 
@@ -412,8 +635,18 @@ skipBtn.addEventListener('click', goNext);
 passage.addEventListener('click', () => typeBox.focus());
 nextBtn.addEventListener('click', goNext);
 retryBtn.addEventListener('click', retrySection);
-endBtn.addEventListener('click', () => leavePlay('done'));
+endBtn.addEventListener('click', showSummary);
 document.addEventListener('keydown', handlePageKeys);
+source.addEventListener('input', () => save(SOURCE_KEY, source.value));
+sampleBtn.addEventListener('click', () => setTranscript(SAMPLE_TRANSCRIPT));
+clearBtn.addEventListener('click', () => {
+    setTranscript('');
+    source.focus();
+});
+weakestBtn.addEventListener('click', () => startRun(weakestSections()));
+againBtn.addEventListener('click', startAll);
+changeBtn.addEventListener('click', () => show('setup'));
 
+restoreTranscript();
 show('setup');
 update();

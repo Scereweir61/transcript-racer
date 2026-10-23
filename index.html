@@ -11,6 +11,8 @@
         <section id="setup">
             <h2>setup</h2>
             <textarea id="source" rows="8" cols="80" placeholder="Paste a transcript here..."></textarea>
+            <button id="sampleBtn">Load sample</button>
+            <button id="clearBtn">Clear</button>
             <p id="summary"></p>
             <label>
                 <input type="checkbox" id="fillers" checked>
@@ -58,6 +60,26 @@
         </section>
         <section id="done">
             <h2>done</h2>
+            <p>
+                Overall WPM <strong id="totalWpm"></strong>
+                Average score <strong id="totalScore"></strong>
+                Completed <strong id="totalDone"></strong>
+            </p>
+            <table id="resultsTable">
+                <thead>
+                    <tr>
+                        <th class="col-num">#</th>
+                        <th>Section</th>
+                        <th class="col-stat">WPM</th>
+                        <th class="col-stat">Score</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+            <p id="noResults" hidden>No sections finished this time.</p>
+            <button id="weakestBtn">Practise weakest sections</button>
+            <button id="againBtn">Do it all again</button>
+            <button id="changeBtn">Change transcript or mode</button>
         </section>
     </body>
 </html>

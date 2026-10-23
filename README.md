@@ -7,7 +7,7 @@ Input transcript then have to type up the transcripts in a typeracer style game,
 - [x] Sections: splits the cleaned text into sentences and groups them into sections
 - [x] Typing game: per-letter colouring, blinking caret, paste blocked, restart and skip
 - [x] WPM and accuracy: live stats strip, result panel with Next / Try again / End session
-- [ ] Session summary and saving
+- [x] Session summary and saving: results table, weak pills, weakest-sections drill, transcript saved in localStorage, sample transcript
 - [ ] Fill-the-blanks mode
 - [ ] Recall mode
 - [ ] Make it look good

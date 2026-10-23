@@ -43,6 +43,37 @@
     }
 }
 
+/* fixed layout lets the snippet column shrink instead of stretching the table */
+#resultsTable {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+#resultsTable .col-num {
+    width: 2.5rem;
+}
+
+#resultsTable .col-stat {
+    width: 7rem;
+}
+
+/* keep each snippet on one line and end it with "..." if it's too long */
+#resultsTable .snippet {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pill {
+    margin-left: 0.4rem;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: var(--bad);
+    background: var(--bad-bg);
+}
+
 #typeBox {
     width: 100%;
     font-family: Consolas, "Courier New", monospace;
