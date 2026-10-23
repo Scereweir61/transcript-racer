@@ -10,6 +10,18 @@ const passage = document.getElementById('passage');
 const typeBox = document.getElementById('typeBox');
 const restartBtn = document.getElementById('restartBtn');
 const skipBtn = document.getElementById('skipBtn');
+const wpmStat = document.getElementById('wpmStat');
+const accStat = document.getElementById('accStat');
+const timeStat = document.getElementById('timeStat');
+const typingArea = document.getElementById('typingArea');
+const resultPanel = document.getElementById('resultPanel');
+const resultWpm = document.getElementById('resultWpm');
+const resultAcc = document.getElementById('resultAcc');
+const resultTime = document.getElementById('resultTime');
+const resultNote = document.getElementById('resultNote');
+const nextBtn = document.getElementById('nextBtn');
+const retryBtn = document.getElementById('retryBtn');
+const endBtn = document.getElementById('endBtn');
 
 // the current list of sections, made from the cleaned transcript
 let sections = [];
@@ -20,6 +32,13 @@ let pos = 0;
 
 // everything about the section being typed right now (set by loadSection)
 let cur = null;
+
+// the id of the interval that refreshes the live stats, or null if none is running
+let statsTimer = null;
+
+// the result of the section just finished, and of the attempt before a retry
+let lastResult = null;
+let previousAttempt = null;
 
 function show(view) {
     const screens = document.querySelectorAll("section");
@@ -127,16 +146,25 @@ function startAll() {
 
 // Set up the section at position `pos` of the run, ready to be typed.
 function loadSection() {
+    stopTimer();
     cur = {
         index: order[pos],
         target: sections[order[pos]],
-        spans: []
+        spans: [],
+        prevTyped: '',     // what the box held before the latest input
+        keystrokes: 0,     // new characters typed
+        errors: 0,         // new characters that were wrong
+        startTime: null,   // set on the first keystroke
+        endTime: null      // set when the section is finished
     };
     sectionLabel.textContent = `Section ${pos + 1} of ${order.length}`;
     renderPassage();
     typeBox.value = '';
     typeBox.disabled = false;
+    typingArea.hidden = false;
+    resultPanel.hidden = true;
     paintLetters('');
+    updateStats();
     typeBox.focus();
 }
 
@@ -180,6 +208,10 @@ function handleTyping() {
     }
 
     const typed = typeBox.value;
+    if (cur.startTime === null && typed.length > 0) {
+        startTimer();
+    }
+    scoreNewCharacters(typed);
     paintLetters(typed);
 
     if (typed === cur.target) {
@@ -187,14 +219,165 @@ function handleTyping() {
     }
 }
 
+// Count keystrokes and errors, but only for characters beyond what was
+// there last time. Backspacing and retyping a letter counts as a new keystroke,
+// so a mistake that gets fixed still stays in the error count.
+function scoreNewCharacters(typed) {
+    for (let i = cur.prevTyped.length; i < typed.length; i++) {
+        cur.keystrokes++;
+        if (typed[i] !== cur.target[i]) {
+            cur.errors++;
+        }
+    }
+    cur.prevTyped = typed;
+}
+
+// How many typed characters match the target in the same position.
+function countCorrect(typed) {
+    let correct = 0;
+    for (let i = 0; i < typed.length; i++) {
+        if (typed[i] === cur.target[i]) correct++;
+    }
+    return correct;
+}
+
+// Milliseconds since the first keystroke (frozen once the section is finished).
+function elapsedMs() {
+    if (cur.startTime === null) return 0;
+    if (cur.endTime !== null) return cur.endTime - cur.startTime;
+    return performance.now() - cur.startTime;
+}
+
+// Words per minute, where a "word" is any 5 characters.
+// Shows 0 for the first 1.5 seconds, when a couple of quick letters
+// would otherwise look like a silly speed.
+function calcWpm(chars, ms) {
+    if (ms < 1500) return 0;
+    const minutes = ms / 60000;
+    return Math.round((chars / 5) / minutes);
+}
+
+// Percentage of keystrokes that were right. Rounded down, so a single
+// mistake never gets rounded back up to 100%.
+function calcAccuracy() {
+    if (cur.keystrokes === 0) return 100;
+    return Math.floor((cur.keystrokes - cur.errors) / cur.keystrokes * 100);
+}
+
+// Turn milliseconds into m:ss, e.g. 75000 -> "1:15".
+function formatTime(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+// Start the clock and refresh the live stats 4 times a second.
+function startTimer() {
+    cur.startTime = performance.now();
+    statsTimer = setInterval(updateStats, 250);
+}
+
+// Stop refreshing the live stats. Safe to call even if nothing is running.
+function stopTimer() {
+    clearInterval(statsTimer);
+    statsTimer = null;
+}
+
+// Write the current WPM, accuracy and time into the stats strip.
+function updateStats() {
+    const ms = elapsedMs();
+    wpmStat.textContent = calcWpm(countCorrect(typeBox.value), ms);
+    accStat.textContent = calcAccuracy() + '%';
+    timeStat.textContent = formatTime(ms);
+}
+
 // Runs when the typed text exactly matches the target.
 function finishSection() {
+    cur.endTime = performance.now();
+    stopTimer();
+    updateStats();
     typeBox.disabled = true;
+
+    const ms = elapsedMs();
+    lastResult = {
+        wpm: calcWpm(cur.target.length, ms),
+        accuracy: calcAccuracy(),
+        ms: ms
+    };
+    showResult(lastResult);
+}
+
+// Swap the typing area for the result panel and fill it in.
+function showResult(result) {
+    typingArea.hidden = true;
+    resultPanel.hidden = false;
+    resultWpm.textContent = result.wpm;
+    resultAcc.textContent = result.accuracy + '%';
+    resultTime.textContent = formatTime(result.ms);
+    resultNote.textContent = makeResultNote(result);
+
+    if (pos === order.length - 1) {
+        nextBtn.textContent = 'See summary';
+    } else {
+        nextBtn.textContent = 'Next section';
+    }
+    nextBtn.focus();
+}
+
+// A short comment on the result: compare with the last try, and
+// suggest another go if accuracy was under 90%.
+function makeResultNote(result) {
+    const notes = [];
+    if (previousAttempt !== null) {
+        const wpmChange = result.wpm - previousAttempt.wpm;
+        const accChange = result.accuracy - previousAttempt.accuracy;
+        notes.push(`Compared with last try: ${describeChange(wpmChange, ' WPM')}, ${describeChange(accChange, '% accuracy')}.`);
+    }
+    if (result.accuracy < 90) {
+        notes.push('Accuracy was under 90%, so this one could use another go.');
+    }
+    return notes.join(' ');
+}
+
+// Describe a change as "up 5 WPM", "down 2% accuracy" or "same WPM".
+function describeChange(amount, unit) {
+    if (amount > 0) return `up ${amount}${unit}`;
+    if (amount < 0) return `down ${-amount}${unit}`;
+    return `same${unit}`;
+}
+
+// Try the same section again, remembering this result to compare against.
+function retrySection() {
+    previousAttempt = lastResult;
+    loadSection();
+}
+
+// Go on from the result panel to the next section.
+function goNext() {
+    previousAttempt = null;
     nextSection();
+}
+
+// Leave the play screen for another screen, making sure the stats timer stops.
+function leavePlay(view) {
+    stopTimer();
+    show(view);
+}
+
+// Enter on the result panel means "Next". Buttons handle their own Enter,
+// so ignore it when a button has focus (otherwise it would fire twice).
+function handlePageKeys(event) {
+    if (event.key !== 'Enter') return;
+    if (resultPanel.hidden || document.getElementById('play').hidden) return;
+    if (event.target.tagName === 'BUTTON') return;
+    event.preventDefault();
+    goNext();
 }
 
 // Move to the next section in the run, or to the done screen after the last one.
 function nextSection() {
+    stopTimer();
     pos++;
     if (pos < order.length) {
         loadSection();
@@ -216,7 +399,7 @@ function handleTypingKeys(event) {
 }
 
 startBtn.addEventListener('click', startAll);
-backBtn.addEventListener('click', () => show('setup'));
+backBtn.addEventListener('click', () => leavePlay('setup'));
 source.addEventListener('input', update);
 fillers.addEventListener('change', update);
 perSection.addEventListener('change', update);
@@ -225,8 +408,12 @@ typeBox.addEventListener('keydown', handleTypingKeys);
 typeBox.addEventListener('paste', blockPaste);
 typeBox.addEventListener('drop', blockPaste);
 restartBtn.addEventListener('click', loadSection);
-skipBtn.addEventListener('click', nextSection);
+skipBtn.addEventListener('click', goNext);
 passage.addEventListener('click', () => typeBox.focus());
+nextBtn.addEventListener('click', goNext);
+retryBtn.addEventListener('click', retrySection);
+endBtn.addEventListener('click', () => leavePlay('done'));
+document.addEventListener('keydown', handlePageKeys);
 
 show('setup');
 update();

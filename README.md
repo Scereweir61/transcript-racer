@@ -6,7 +6,7 @@ Input transcript then have to type up the transcripts in a typeracer style game,
 - [x] Cleaning: removes timestamps, `[Music]`-style tags, filler words (optional) and hard-to-type characters
 - [x] Sections: splits the cleaned text into sentences and groups them into sections
 - [x] Typing game: per-letter colouring, blinking caret, paste blocked, restart and skip
-- [ ] WPM and accuracy
+- [x] WPM and accuracy: live stats strip, result panel with Next / Try again / End session
 - [ ] Session summary and saving
 - [ ] Fill-the-blanks mode
 - [ ] Recall mode

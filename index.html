@@ -34,10 +34,27 @@
             <h2>play</h2>
             <button id="backBtn">Back</button>
             <p id="sectionLabel"></p>
-            <p id="passage"></p>
-            <textarea id="typeBox" rows="3" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Start typing..."></textarea>
-            <button id="restartBtn">Restart section</button>
-            <button id="skipBtn">Skip</button>
+            <div id="stats">
+                <span>WPM <strong id="wpmStat">0</strong></span>
+                <span>Accuracy <strong id="accStat">100%</strong></span>
+                <span>Time <strong id="timeStat">0:00</strong></span>
+            </div>
+            <div id="typingArea">
+                <p id="passage"></p>
+                <textarea id="typeBox" rows="3" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Start typing..."></textarea>
+                <button id="restartBtn">Restart section</button>
+                <button id="skipBtn">Skip</button>
+            </div>
+            <div id="resultPanel" hidden>
+                <h3>Section done!</h3>
+                <p>WPM <strong id="resultWpm"></strong></p>
+                <p>Accuracy <strong id="resultAcc"></strong></p>
+                <p>Time <strong id="resultTime"></strong></p>
+                <p id="resultNote"></p>
+                <button id="nextBtn">Next section</button>
+                <button id="retryBtn">Try again</button>
+                <button id="endBtn">End session</button>
+            </div>
         </section>
         <section id="done">
             <h2>done</h2>

@@ -43,3 +43,32 @@ Every time you type, `letterClass` looks at each position `i` and compares it wi
 3. Otherwise you haven't reached it, so it gets no class and stays grey.
 
 Backspacing makes the typed text shorter, so the letter you deleted falls into rule 2 or 3 again and goes back to grey. The caret is drawn with `box-shadow: inset 2px 0 0` (a 2px line on the left edge of the letter) instead of a colour change, so the letter itself stays grey. A `@keyframes` animation switches the shadow off halfway through each second, which makes it blink.
+
+## Phase 6: WPM and accuracy
+
+### What was added
+
+- **HTML:** a stats strip (`#wpmStat`, `#accStat`, `#timeStat`). The passage, typing box and buttons are now wrapped in `#typingArea`, and there's a new `#resultPanel` with Next section, Try again and End session buttons.
+- **JavaScript:** `cur` now also keeps `prevTyped`, `keystrokes`, `errors`, `startTime` and `endTime`. There are new top-level variables: `statsTimer` (the interval id), `lastResult` and `previousAttempt`.
+
+### The new functions
+
+- `scoreNewCharacters(typed)` looks only at characters past the length of `cur.prevTyped` (the box's contents last time). Each one adds a keystroke, and a wrong one adds an error. Then it saves `typed` as the new `prevTyped`.
+- `countCorrect(typed)` counts the typed characters that match the target in the same position.
+- `elapsedMs()` returns the milliseconds since the first keystroke, frozen at `endTime` once the section is finished.
+- `calcWpm(chars, ms)` returns `(chars ÷ 5) ÷ minutes`, or 0 for the first 1.5 seconds. Two letters typed in 0.1 seconds would otherwise show as 240 WPM.
+- `calcAccuracy()` returns `(keystrokes − errors) ÷ keystrokes` as a percentage. It's rounded **down** so one slip in 300 letters shows 99%, not a rounded-up 100%.
+- `formatTime(ms)` turns milliseconds into `m:ss`. `padStart(2, '0')` turns `5` into `05`.
+- `startTimer()` runs on the first keystroke, not when the section loads, so reading the passage first doesn't hurt your WPM. It records `performance.now()` (a precise millisecond clock) and starts a `setInterval` that calls `updateStats()` every 250 ms.
+- `stopTimer()` calls `clearInterval` and sets `statsTimer` back to `null`. It's called when a section finishes, when a new section loads, when you skip, and when you leave the play screen (`leavePlay`), so an interval is never left running in the background.
+- `finishSection()` stops the clock, works out the result (`wpm`, `accuracy`, `ms`) and calls `showResult()`.
+- `showResult(result)` hides the typing area, shows the result panel, and fills in the numbers and a note. On the last section the Next button says "See summary".
+- `makeResultNote(result)` compares with `previousAttempt` after a retry ("up 5 WPM, down 2% accuracy") and suggests another go when accuracy is under 90%. `describeChange` writes each "up/down/same" part.
+- `retrySection()` remembers the result as `previousAttempt` and reloads the section. `goNext()` clears it and moves on.
+- `handlePageKeys(event)` makes Enter mean "Next" while the result panel is showing. It ignores Enter when a button has focus, because the browser already clicks a focused button on Enter, and handling it twice would skip a section.
+
+### Explain it: why divide by 5, and why accuracy counts keystrokes
+
+**Why ÷ 5:** words are different lengths. "a" and "mitochondria" would both count as one word, so a passage full of short words would look faster. Typing tests agree that a "word" is any 5 characters, spaces and punctuation included. That way 100 correct characters is always 20 words, whatever the text. 100 characters in 30 seconds is 20 words in 0.5 minutes, which is 40 WPM.
+
+**Why keystrokes, not the final text:** you can't finish a section until the text is perfect, so the final text is always 100% correct. Comparing it with the target would tell us nothing. Instead we count every new character as it's typed. If you type a wrong letter, backspace and fix it, that's 2 keystrokes and 1 error, so the mistake still shows in your accuracy. Only characters beyond the previous length count, so deleting doesn't add keystrokes.
