@@ -39,6 +39,25 @@ const blankDensity = document.getElementById('blankDensity');
 const revealBtn = document.getElementById('revealBtn');
 const blanksRow = document.getElementById('blanksRow');
 const resultBlanks = document.getElementById('resultBlanks');
+const recallOptions = document.getElementById('recallOptions');
+const readTime = document.getElementById('readTime');
+const accStatBox = document.getElementById('accStatBox');
+const studyBox = document.getElementById('studyBox');
+const countdown = document.getElementById('countdown');
+const countdownFill = document.getElementById('countdownFill');
+const readyBtn = document.getElementById('readyBtn');
+const recallMsg = document.getElementById('recallMsg');
+const recallButtons = document.getElementById('recallButtons');
+const checkBtn = document.getElementById('checkBtn');
+const peekBtn = document.getElementById('peekBtn');
+const recallRows = document.getElementById('recallRows');
+const resultRecalled = document.getElementById('resultRecalled');
+const resultWords = document.getElementById('resultWords');
+const resultPeeks = document.getElementById('resultPeeks');
+const accRow = document.getElementById('accRow');
+const diffBox = document.getElementById('diffBox');
+const diffOriginal = document.getElementById('diffOriginal');
+const diffTyped = document.getElementById('diffTyped');
 
 // the names the app saves things under in localStorage
 const SOURCE_KEY = 'transcriptRacer.source';
@@ -113,6 +132,10 @@ let cur = null;
 // the id of the interval that refreshes the live stats, or null if none is running
 let statsTimer = null;
 
+// Recall mode timers: the reading countdown and the 2-second peek
+let studyTimer = null;
+let peekTimer = null;
+
 // the result of the section just finished, and of the attempt before a retry
 let lastResult = null;
 let previousAttempt = null;
@@ -120,7 +143,7 @@ let previousAttempt = null;
 // results for this run, keyed by section number: { wpm, score, ms, chars, attempts }
 let results = {};
 
-// the study mode for this run: 'copy' or 'blanks'
+// the study mode for this run: 'copy', 'blanks' or 'recall'
 let runMode = 'copy';
 
 function show(view) {
@@ -210,7 +233,7 @@ function update() {
     startBtn.disabled = sections.length === 0;
 }
 
-// The mode whose radio button is ticked: 'copy' or 'blanks'.
+// The mode whose radio button is ticked: 'copy', 'blanks' or 'recall'.
 function selectedMode() {
     return document.querySelector('input[name="mode"]:checked').value;
 }
@@ -218,6 +241,7 @@ function selectedMode() {
 // Show only the options that belong to the ticked mode, and remember the choice.
 function handleModeChange() {
     blanksOptions.hidden = selectedMode() !== 'blanks';
+    recallOptions.hidden = selectedMode() !== 'recall';
     save(MODE_KEY, selectedMode());
 }
 
@@ -348,18 +372,120 @@ function loadSection() {
         blanks: blanks,    // the hidden words (empty in Copy mode)
         mask: makeMask(target.length, blanks),
         revealed: new Set(),  // ids of blanks revealed with Tab
-        missed: new Set()     // ids of blanks mistyped or revealed
+        missed: new Set(),    // ids of blanks mistyped or revealed
+        phase: 'typing',      // Recall mode uses 'study' then 'recall'
+        peeks: 0              // Recall mode: how many times Peek was used
     };
     sectionLabel.textContent = `Section ${pos + 1} of ${order.length}`;
-    renderPassage();
     typeBox.value = '';
-    typeBox.disabled = false;
     typingArea.hidden = false;
     resultPanel.hidden = true;
     revealBtn.hidden = runMode !== 'blanks';
-    paintLetters('');
+    accStatBox.hidden = runMode === 'recall';
     updateStats();
+
+    if (runMode === 'recall') {
+        startStudy();
+    } else {
+        startTyping();
+    }
+}
+
+// Copy and Fill the blanks: show the passage letter by letter, ready to type.
+function startTyping() {
+    passage.hidden = false;
+    studyBox.hidden = true;
+    recallMsg.hidden = true;
+    recallButtons.hidden = true;
+    renderPassage();
+    paintLetters('');
+    typeBox.disabled = false;
     typeBox.focus();
+}
+
+// Keep a number between a smallest and a largest value.
+function clamp(number, smallest, largest) {
+    return Math.min(Math.max(number, smallest), largest);
+}
+
+// Split text into words, dropping any that are only punctuation (like "-").
+function toWords(text) {
+    return text.split(/\s+/).filter(word => normaliseWord(word) !== '');
+}
+
+// How many seconds to show the text before hiding it. Auto gives about
+// 0.45 seconds per word, but never less than 5 or more than 30.
+// 0 means "until I'm ready".
+function readingSeconds(text) {
+    if (readTime.value === 'auto') {
+        return clamp(Math.round(toWords(text).length * 0.45), 5, 30);
+    }
+    return Number(readTime.value);
+}
+
+// Recall, part 1: show the whole text with a draining countdown bar.
+// The typing box stays disabled until the text is hidden.
+function startStudy() {
+    cur.phase = 'study';
+    passage.hidden = false;
+    passage.textContent = cur.target;
+    studyBox.hidden = false;
+    recallMsg.hidden = true;
+    recallButtons.hidden = true;
+    typeBox.disabled = true;
+
+    const seconds = readingSeconds(cur.target);
+    countdown.hidden = seconds === 0;
+    if (seconds > 0) {
+        cur.studyMs = seconds * 1000;
+        cur.studyEnds = performance.now() + cur.studyMs;
+        countdownFill.style.width = '100%';
+        studyTimer = setInterval(updateCountdown, 100);
+    }
+    readyBtn.focus();
+}
+
+// Shrink the countdown bar, and hide the text when time runs out.
+function updateCountdown() {
+    const remaining = cur.studyEnds - performance.now();
+    if (remaining <= 0) {
+        startRecall();
+        return;
+    }
+    countdownFill.style.width = (remaining / cur.studyMs * 100) + '%';
+}
+
+// Recall, part 2: hide the text and let the user type what they remember.
+function startRecall() {
+    clearInterval(studyTimer);
+    studyTimer = null;
+    cur.phase = 'recall';
+    studyBox.hidden = true;
+    passage.hidden = true;
+    recallMsg.hidden = false;
+    recallMsg.textContent = `Poof, it's gone! Type the ${toWords(cur.target).length} words you remember, then press Enter to check.`;
+    recallButtons.hidden = false;
+    peekBtn.disabled = false;
+    typeBox.disabled = false;
+    typeBox.focus();
+}
+
+// Show the text again for 2 seconds, and count the peek.
+function peek() {
+    cur.peeks++;
+    peekBtn.disabled = true;
+    passage.hidden = false;
+    recallMsg.hidden = true;
+    peekTimer = setTimeout(endPeek, 2000);
+    typeBox.focus();
+}
+
+// Hide the text again after a peek.
+function endPeek() {
+    peekTimer = null;
+    passage.hidden = true;
+    recallMsg.hidden = false;
+    peekBtn.disabled = false;
 }
 
 // Put the passage on screen as one <span> per character, so each letter
@@ -437,6 +563,15 @@ function revealNextBlank() {
 
 // Runs every time the typing box changes.
 function handleTyping() {
+    // Recall is free typing: no colouring, no length limit, and it only
+    // finishes when the user presses Enter or Check
+    if (runMode === 'recall') {
+        if (cur.startTime === null && typeBox.value.length > 0) {
+            startTimer();
+        }
+        return;
+    }
+
     // never let the typed text get longer than the target
     if (typeBox.value.length > cur.target.length) {
         typeBox.value = typeBox.value.slice(0, cur.target.length);
@@ -517,16 +652,28 @@ function startTimer() {
     statsTimer = setInterval(updateStats, 250);
 }
 
-// Stop refreshing the live stats. Safe to call even if nothing is running.
+// Stop every timer the play screen uses: the live stats, the Recall
+// countdown and a peek. Safe to call even if nothing is running.
 function stopTimer() {
     clearInterval(statsTimer);
     statsTimer = null;
+    clearInterval(studyTimer);
+    studyTimer = null;
+    clearTimeout(peekTimer);
+    peekTimer = null;
+}
+
+// How many characters count towards WPM: in Recall, everything typed
+// (there's no letter-by-letter target), otherwise only correct ones.
+function wpmChars() {
+    if (runMode === 'recall') return typeBox.value.length;
+    return countCorrect(typeBox.value);
 }
 
 // Write the current WPM, accuracy and time into the stats strip.
 function updateStats() {
     const ms = elapsedMs();
-    wpmStat.textContent = calcWpm(countCorrect(typeBox.value), ms);
+    wpmStat.textContent = calcWpm(wpmChars(), ms);
     accStat.textContent = calcAccuracy() + '%';
     timeStat.textContent = formatTime(ms);
 }
@@ -538,12 +685,23 @@ function finishSection() {
     updateStats();
     typeBox.disabled = true;
 
+    if (runMode === 'recall') {
+        lastResult = makeRecallResult();
+    } else {
+        lastResult = makeTypingResult();
+    }
+    recordResult(cur.index, lastResult);
+    showResult(lastResult);
+}
+
+// The result of a Copy or Fill-the-blanks section.
+function makeTypingResult() {
     const ms = elapsedMs();
     const accuracy = calcAccuracy();
     const totalBlanks = cur.blanks.length;
     const recalled = totalBlanks - cur.missed.size;
 
-    lastResult = {
+    const result = {
         wpm: calcWpm(cur.target.length, ms),
         accuracy: accuracy,
         score: accuracy,   // in Copy mode, the main score is accuracy
@@ -555,15 +713,108 @@ function finishSection() {
     // in Fill the blanks, the main score is the share of blanks recalled
     // (a section with no blanks falls back to accuracy)
     if (runMode === 'blanks' && totalBlanks > 0) {
-        lastResult.score = Math.round(recalled / totalBlanks * 100);
+        result.score = Math.round(recalled / totalBlanks * 100);
     }
-    recordResult(cur.index, lastResult);
-    showResult(lastResult);
+    return result;
+}
+
+// The result of a Recall section: how many of the original words were
+// typed, in the right order (see wordDiff).
+function makeRecallResult() {
+    const ms = elapsedMs();
+    const typed = typeBox.value;
+    const diff = wordDiff(cur.target, typed);
+
+    let score = 0;
+    if (diff.total > 0) {
+        score = Math.round(diff.hitCount / diff.total * 100);
+    }
+    return {
+        wpm: calcWpm(typed.length, ms),
+        score: score,
+        ms: ms,
+        chars: typed.length,
+        diff: diff,
+        typed: typed,
+        peeks: cur.peeks
+    };
+}
+
+// Make text comparable: lowercase, keeping only letters and digits,
+// so "Cell," and "cell" count as the same word.
+function normaliseWord(word) {
+    return word.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Compare the original text with what was typed, word by word.
+// Returns { words, hits, hitCount, total }, where hits[i] is true if
+// original word i was typed in the right order.
+//
+// It finds the LONGEST COMMON SUBSEQUENCE (LCS): the longest list of
+// words that appears in both, in the same order, though not necessarily
+// side by side. E.g. original "the cell makes energy" and typed
+// "cell makes some energy" share "cell makes energy" (3 words).
+function wordDiff(target, typed) {
+    const targetWords = toWords(target);
+    const original = targetWords.map(normaliseWord);
+    const attempt = toWords(typed).map(normaliseWord);
+
+    // THE TABLE
+    // table[i][j] = length of the LCS of the first i original words and
+    // the first j typed words. It has one extra row and column for
+    // "no words yet", which are all 0 because nothing can match nothing.
+    // Each cell is filled from cells already done (above and to the left):
+    //   - if original word i matches typed word j, both can be used, so
+    //     it's one more than the answer without either: table[i-1][j-1] + 1
+    //   - if not, one of them must be left out, so take the better of
+    //     leaving out the original word (table[i-1][j]) or leaving out
+    //     the typed word (table[i][j-1])
+    // The bottom-right cell is the LCS length for the whole texts.
+    const table = [];
+    for (let i = 0; i <= original.length; i++) {
+        table.push(new Array(attempt.length + 1).fill(0));
+    }
+    for (let i = 1; i <= original.length; i++) {
+        for (let j = 1; j <= attempt.length; j++) {
+            if (original[i - 1] === attempt[j - 1]) {
+                table[i][j] = table[i - 1][j - 1] + 1;
+            } else {
+                table[i][j] = Math.max(table[i - 1][j], table[i][j - 1]);
+            }
+        }
+    }
+
+    // BACKTRACKING
+    // Walk back from the bottom-right corner to find which words were used.
+    // A match means that original word was hit, so step diagonally.
+    // Otherwise step towards whichever neighbour kept the bigger LCS.
+    const hits = new Array(original.length).fill(false);
+    let i = original.length;
+    let j = attempt.length;
+    while (i > 0 && j > 0) {
+        if (original[i - 1] === attempt[j - 1]) {
+            hits[i - 1] = true;
+            i--;
+            j--;
+        } else if (table[i - 1][j] >= table[i][j - 1]) {
+            i--;
+        } else {
+            j--;
+        }
+    }
+
+    return {
+        words: targetWords,
+        hits: hits,
+        hitCount: table[original.length][attempt.length],
+        total: original.length
+    };
 }
 
 // What the main score measures in this mode, for the retry note.
 function scoreName() {
     if (runMode === 'blanks') return '% blanks recalled';
+    if (runMode === 'recall') return '% recalled';
     return '% accuracy';
 }
 
@@ -590,8 +841,16 @@ function showResult(result) {
     resultWpm.textContent = result.wpm;
     resultAcc.textContent = result.accuracy + '%';
     resultTime.textContent = formatTime(result.ms);
+    accRow.hidden = runMode === 'recall';
     blanksRow.hidden = runMode !== 'blanks';
-    resultBlanks.textContent = `${result.recalled}/${result.totalBlanks}`;
+    recallRows.hidden = runMode !== 'recall';
+    diffBox.hidden = runMode !== 'recall';
+    if (runMode === 'blanks') {
+        resultBlanks.textContent = `${result.recalled}/${result.totalBlanks}`;
+    }
+    if (runMode === 'recall') {
+        showRecallResult(result);
+    }
     resultNote.textContent = makeResultNote(result);
 
     if (pos === order.length - 1) {
@@ -600,6 +859,33 @@ function showResult(result) {
         nextBtn.textContent = 'Next section';
     }
     nextBtn.focus();
+}
+
+// Fill in the Recall parts of the result panel: the numbers, the original
+// with hit words green and missed words red, and what was typed.
+function showRecallResult(result) {
+    resultRecalled.textContent = result.score + '%';
+    resultWords.textContent = `${result.diff.hitCount}/${result.diff.total}`;
+    resultPeeks.textContent = result.peeks;
+
+    diffOriginal.textContent = '';
+    for (let i = 0; i < result.diff.words.length; i++) {
+        const span = document.createElement('span');
+        span.textContent = result.diff.words[i];
+        if (result.diff.hits[i]) {
+            span.className = 'hit';
+        } else {
+            span.className = 'miss';
+        }
+        diffOriginal.appendChild(span);
+        diffOriginal.appendChild(document.createTextNode(' '));
+    }
+
+    if (result.typed.trim() === '') {
+        diffTyped.textContent = '(nothing)';
+    } else {
+        diffTyped.textContent = result.typed;
+    }
 }
 
 // A short comment on the result: compare with the last try, and
@@ -611,7 +897,7 @@ function makeResultNote(result) {
         const scoreChange = result.score - previousAttempt.score;
         notes.push(`Compared with last try: ${describeChange(wpmChange, ' WPM')}, ${describeChange(scoreChange, scoreName())}.`);
     }
-    if (result.accuracy < 90) {
+    if (runMode !== 'recall' && result.accuracy < 90) {
         notes.push('Accuracy was under 90%, so this one could use another go.');
     }
     return notes.join(' ');
@@ -648,6 +934,8 @@ function handlePageKeys(event) {
     if (event.key !== 'Enter') return;
     if (resultPanel.hidden || document.getElementById('play').hidden) return;
     if (event.target.tagName === 'BUTTON') return;
+    // the Enter that submits a Recall answer must not also skip its result
+    if (event.target === typeBox) return;
     event.preventDefault();
     goNext();
 }
@@ -810,10 +1098,14 @@ function blockPaste(event) {
 }
 
 // Enter would add a new line, which never matches the target, so block it.
+// In Recall, Enter submits the answer instead.
 // In Fill the blanks, Tab reveals the next blank instead of moving focus.
 function handleTypingKeys(event) {
     if (event.key === 'Enter') {
         event.preventDefault();
+        if (runMode === 'recall' && cur.phase === 'recall') {
+            finishSection();
+        }
     }
     if (event.key === 'Tab' && runMode === 'blanks') {
         event.preventDefault();
@@ -848,6 +1140,9 @@ againBtn.addEventListener('click', startAll);
 changeBtn.addEventListener('click', () => show('setup'));
 modePicker.addEventListener('change', handleModeChange);
 revealBtn.addEventListener('click', revealNextBlank);
+readyBtn.addEventListener('click', startRecall);
+checkBtn.addEventListener('click', finishSection);
+peekBtn.addEventListener('click', peek);
 
 restoreTranscript();
 restoreMode();

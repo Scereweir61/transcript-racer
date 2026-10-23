@@ -146,3 +146,63 @@ Take two candidates, **glycolysis** and **ATP**:
 Each word gets a "luck" number: `Math.random() × weight`. `Math.random()` is anywhere from 0 to 1, so glycolysis gets a random number between 0 and 100 and ATP gets one between 0 and 64. The words are sorted by luck, biggest first, and the top N become blanks.
 
 If we only need one blank, glycolysis wins most of the time because its range is bigger. ATP can still win, though: if glycolysis rolls 0.3 (luck 30) and ATP rolls 0.8 (luck 51.2), ATP is picked. So important-looking words are more likely to be hidden, but there's always some chance for the others, and every retry hides a different set. Squaring the length makes the gap bigger: a 10-letter word is only twice as long as a 5-letter one, but its weight is four times bigger (100 vs 25).
+
+## Phase 9: Recall mode
+
+### What was added
+
+- **Setup screen:** a Recall radio button and a "Reading time before it hides" option: Auto, 5s, 10s, 20s, or Until I'm ready.
+- **Play screen, study phase:** the whole text is shown with a countdown bar that drains, plus an "I'm ready, hide it" button. The typing box is disabled.
+- **Play screen, recall phase:** the text is hidden behind a message giving the word count. You type freely, with no colouring and no length limit. Enter or Check submits. Peek shows the text for 2 seconds and is counted.
+- **Result panel:** % recalled, words x/y, WPM, peeks and time. Below that, the original text with the words you got in green and the ones you missed in red, and "What you typed".
+- The live accuracy stat is hidden in Recall, because there's no letter-by-letter target to be accurate against.
+
+### Refactors
+
+- `loadSection` now does the setup shared by every mode, then calls `startTyping()` (Copy and Fill the blanks, the old behaviour) or `startStudy()` (Recall).
+- `finishSection` now asks `makeTypingResult()` or `makeRecallResult()` for the result. The typing one is the old code moved into its own function.
+- `stopTimer` now stops all three timers the play screen can have running: live stats, the reading countdown and a peek. Everywhere that already called it (finishing, loading, skipping, leaving) now cleans up the Recall timers too.
+- `handlePageKeys` ignores Enter that comes from the typing box. In Recall, that Enter submits the answer and opens the result panel. Without this check the same key press would bubble up to the page and skip straight past the result.
+
+### The new functions
+
+- `clamp(number, smallest, largest)` keeps a number in a range.
+- `toWords(text)` splits on whitespace and drops "words" that are only punctuation.
+- `readingSeconds(text)`: Auto is `clamp(round(words × 0.45), 5, 30)`. A 50-word section gets 23 seconds.
+- `startStudy()` shows the text, disables the box and starts a 100 ms interval that calls `updateCountdown()`. With "Until I'm ready" (0 seconds) there's no bar and no timer.
+- `updateCountdown()` sets the bar's width to the share of time left, and calls `startRecall()` when time runs out.
+- `startRecall()` stops the countdown, hides the text, shows the message and enables the box.
+- `peek()` adds 1 to `cur.peeks`, shows the text and sets a 2-second `setTimeout` for `endPeek()`, which hides it again. The Peek button is disabled during a peek so it can't be double-counted.
+- `wpmChars()`: in Recall, WPM counts every typed character. In the other modes it counts correct ones.
+- `normaliseWord(word)` lowercases and keeps only `a-z` and `0-9`, so `"Cell,"` and `cell` are equal.
+- `wordDiff(target, typed)` scores the answer using the longest common subsequence (below).
+- `showRecallResult(result)` builds the green/red original with one `<span>` per word.
+
+### Explain it: the longest common subsequence (LCS)
+
+A **subsequence** is what's left when you cross out some words but keep the rest in order. The **longest common subsequence** of two texts is the longest list of words you can get from both that way. The score is LCS length ÷ number of original words.
+
+**Example.** Original: *the cell makes energy*. Typed: *cell makes some energy* (forgot "the", added "some").
+
+We fill a table where `table[i][j]` is the LCS of the first `i` original words and the first `j` typed words. Row 0 and column 0 mean "no words yet", so they're 0.
+
+|            | (none) | cell | makes | some | energy |
+|------------|:------:|:----:|:-----:|:----:|:------:|
+| **(none)** | 0 | 0 | 0 | 0 | 0 |
+| **the**    | 0 | 0 | 0 | 0 | 0 |
+| **cell**   | 0 | **1** | 1 | 1 | 1 |
+| **makes**  | 0 | 1 | **2** | 2 | 2 |
+| **energy** | 0 | 1 | 2 | 2 | **3** |
+
+The rule for each cell:
+
+- If the two words match, take the cell diagonally up-left and add 1. For example "makes" = "makes" gives 1 + 1 = 2.
+- If they don't match, copy the bigger of the cell above and the cell to the left.
+
+"the" never matches, so its row is all 0. The bottom-right cell is **3**, so the LCS is 3 words.
+
+**Backtracking** finds *which* words. Start at the bottom-right. "energy" = "energy", so it's a hit and we step diagonally. "makes" vs "some" don't match, so we step towards the bigger neighbour (left, the 2). "makes" = "makes" is a hit, then "cell" = "cell" is a hit. We end up in the "the" row, where nothing matched. Hits are cell, makes and energy. Score: 3 ÷ 4 = **75%**, and "the" is shown in red.
+
+**Why it beats "% of words that appear anywhere":** that simpler method ignores order. Typing *energy makes cell the* would score 100%, even though it's word salad. With LCS, the longest list of words in the same order in both is just 1 word, so it scores 25%. LCS rewards remembering what was said *and in what order*, which is what understanding a lecture needs, while still forgiving a missed or extra word here and there. Punctuation and capitals don't count against you because both texts go through `normaliseWord` first.
+
+The table has (original words + 1) × (typed words + 1) cells, so a 50-word section with a 50-word answer fills about 2,600 cells, which is instant.

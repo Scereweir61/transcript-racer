@@ -9,7 +9,7 @@ Input transcript then have to type up the transcripts in a typeracer style game,
 - [x] WPM and accuracy: live stats strip, result panel with Next / Try again / End session
 - [x] Session summary and saving: results table, weak pills, weakest-sections drill, transcript saved in localStorage, sample transcript
 - [x] Fill-the-blanks mode: mode picker, weighted-random blanks, Tab to reveal, blanks-recalled score
-- [ ] Recall mode
+- [x] Recall mode: read, it hides, type from memory; scored with longest common subsequence
 - [ ] Make it look good
 - [ ] Ship it
 

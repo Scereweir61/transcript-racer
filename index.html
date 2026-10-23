@@ -40,6 +40,11 @@
                     Fill the blanks
                     <small>Key words are hidden. Type them from memory.</small>
                 </label>
+                <label>
+                    <input type="radio" name="mode" value="recall">
+                    Recall
+                    <small>Read it, it disappears, then type what you remember.</small>
+                </label>
             </fieldset>
             <div id="blanksOptions">
                 <label>
@@ -48,6 +53,18 @@
                         <option value="0.15">A few</option>
                         <option value="0.3" selected>Some</option>
                         <option value="0.5">Loads</option>
+                    </select>
+                </label>
+            </div>
+            <div id="recallOptions">
+                <label>
+                    Reading time before it hides
+                    <select id="readTime">
+                        <option value="auto" selected>Auto (based on length)</option>
+                        <option value="5">5 seconds</option>
+                        <option value="10">10 seconds</option>
+                        <option value="20">20 seconds</option>
+                        <option value="0">Until I'm ready</option>
                     </select>
                 </label>
             </div>
@@ -61,22 +78,44 @@
             <p id="sectionLabel"></p>
             <div id="stats">
                 <span>WPM <strong id="wpmStat">0</strong></span>
-                <span>Accuracy <strong id="accStat">100%</strong></span>
+                <span id="accStatBox">Accuracy <strong id="accStat">100%</strong></span>
                 <span>Time <strong id="timeStat">0:00</strong></span>
             </div>
             <div id="typingArea">
+                <div id="studyBox">
+                    <div id="countdown">
+                        <div id="countdownFill"></div>
+                    </div>
+                    <button id="readyBtn">I'm ready, hide it</button>
+                </div>
                 <p id="passage"></p>
+                <p id="recallMsg"></p>
                 <textarea id="typeBox" rows="3" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Start typing..."></textarea>
+                <div id="recallButtons">
+                    <button id="checkBtn">Check</button>
+                    <button id="peekBtn">Peek</button>
+                </div>
                 <button id="restartBtn">Restart section</button>
                 <button id="skipBtn">Skip</button>
                 <button id="revealBtn">Reveal word (Tab)</button>
             </div>
             <div id="resultPanel" hidden>
                 <h3>Section done!</h3>
+                <div id="recallRows">
+                    <p>Recalled <strong id="resultRecalled"></strong></p>
+                    <p>Words <strong id="resultWords"></strong></p>
+                    <p>Peeks <strong id="resultPeeks"></strong></p>
+                </div>
                 <p>WPM <strong id="resultWpm"></strong></p>
-                <p>Accuracy <strong id="resultAcc"></strong></p>
+                <p id="accRow">Accuracy <strong id="resultAcc"></strong></p>
                 <p id="blanksRow">Blanks recalled <strong id="resultBlanks"></strong></p>
                 <p>Time <strong id="resultTime"></strong></p>
+                <div id="diffBox">
+                    <h4>The original</h4>
+                    <p id="diffOriginal"></p>
+                    <h4>What you typed</h4>
+                    <p id="diffTyped"></p>
+                </div>
                 <p id="resultNote"></p>
                 <button id="nextBtn">Next section</button>
                 <button id="retryBtn">Try again</button>

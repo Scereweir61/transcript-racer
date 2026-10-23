@@ -85,6 +85,27 @@
     background: var(--bad-bg);
 }
 
+/* Recall: the reading-time bar drains from full to empty */
+#countdown {
+    height: 0.5rem;
+    background: var(--bad-bg);
+}
+
+#countdownFill {
+    height: 100%;
+    background: var(--accent);
+}
+
+/* Recall result: original words you got (green) and missed (red) */
+#diffOriginal .hit {
+    color: var(--ok);
+}
+
+#diffOriginal .miss {
+    color: var(--bad);
+    text-decoration: line-through;
+}
+
 #typeBox {
     width: 100%;
     font-family: Consolas, "Courier New", monospace;
