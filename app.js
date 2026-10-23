@@ -58,10 +58,29 @@ const accRow = document.getElementById('accRow');
 const diffBox = document.getElementById('diffBox');
 const diffOriginal = document.getElementById('diffOriginal');
 const diffTyped = document.getElementById('diffTyped');
+const dots = document.getElementById('dots');
+const car = document.getElementById('car');
+const streakBox = document.getElementById('streakBox');
+const streakStat = document.getElementById('streakStat');
+const stamp = document.getElementById('stamp');
+const stampGrade = document.getElementById('stampGrade');
+const resultTitle = document.getElementById('resultTitle');
+const pbNote = document.getElementById('pbNote');
+const confettiCanvas = document.getElementById('confetti');
 
 // the names the app saves things under in localStorage
 const SOURCE_KEY = 'transcriptRacer.source';
 const MODE_KEY = 'transcriptRacer.mode';
+const BEST_KEY_START = 'transcriptRacer.best.';   // + mode, e.g. transcriptRacer.best.copy
+
+// a few titles for each grade, one is picked at random
+const GRADE_TITLES = {
+    S: ['Absolute legend!', 'Flawless victory!', 'Big brain energy!'],
+    A: ['Smashed it!', 'On fire!', 'Top of the class!'],
+    B: ['Solid run!', 'Nicely done!', 'Getting there fast!'],
+    C: ['Not bad at all!', 'Warming up!', 'Keep at it!'],
+    D: ['Every expert started here.', 'Shake it off and go again!', 'Practice makes progress.']
+};
 
 // common long words that make poor blanks, because they carry no meaning
 // (written without apostrophes, so "you're" is checked as "youre")
@@ -135,6 +154,10 @@ let statsTimer = null;
 // Recall mode timers: the reading countdown and the 2-second peek
 let studyTimer = null;
 let peekTimer = null;
+
+// the confetti currently falling, and when it started
+let confettiPieces = [];
+let confettiStart = 0;
 
 // the result of the section just finished, and of the attempt before a retry
 let lastResult = null;
@@ -239,9 +262,11 @@ function selectedMode() {
 }
 
 // Show only the options that belong to the ticked mode, and remember the choice.
+// The page's highlight colour follows the mode (see body[data-mode] in the CSS).
 function handleModeChange() {
     blanksOptions.hidden = selectedMode() !== 'blanks';
     recallOptions.hidden = selectedMode() !== 'recall';
+    document.body.dataset.mode = selectedMode();
     save(MODE_KEY, selectedMode());
 }
 
@@ -374,7 +399,8 @@ function loadSection() {
         revealed: new Set(),  // ids of blanks revealed with Tab
         missed: new Set(),    // ids of blanks mistyped or revealed
         phase: 'typing',      // Recall mode uses 'study' then 'recall'
-        peeks: 0              // Recall mode: how many times Peek was used
+        peeks: 0,             // Recall mode: how many times Peek was used
+        streak: 0             // correct letters in a row
     };
     sectionLabel.textContent = `Section ${pos + 1} of ${order.length}`;
     typeBox.value = '';
@@ -382,6 +408,10 @@ function loadSection() {
     resultPanel.hidden = true;
     revealBtn.hidden = runMode !== 'blanks';
     accStatBox.hidden = runMode === 'recall';
+    streakBox.hidden = runMode === 'recall';
+    streakStat.textContent = 0;
+    renderDots();
+    moveCar(0);
     updateStats();
 
     if (runMode === 'recall') {
@@ -389,6 +419,40 @@ function loadSection() {
     } else {
         startTyping();
     }
+}
+
+// Draw one dot per section in the run: filled if finished, grey if
+// skipped, and ringed for the current one.
+function renderDots() {
+    dots.textContent = '';
+    for (let k = 0; k < order.length; k++) {
+        const dot = document.createElement('span');
+        dot.className = 'dot';
+        if (results[order[k]] !== undefined) {
+            dot.classList.add('done');
+        } else if (k < pos) {
+            dot.classList.add('skipped');
+        }
+        if (k === pos) dot.classList.add('current');
+        dots.appendChild(dot);
+    }
+}
+
+// Drive the car along the track. fraction goes from 0 (start) to 1 (flag).
+// Moving it left by the same percentage of its own width keeps it on the road.
+function moveCar(fraction) {
+    const percent = Math.min(fraction, 1) * 100;
+    car.style.left = percent + '%';
+    car.style.transform = `translateX(-${percent}%)`;
+}
+
+// Play a CSS animation again from the start. Just removing and re-adding
+// the class does nothing, because the browser never sees it was gone.
+// Reading offsetWidth in between makes the browser update the page first.
+function restartAnimation(element, className) {
+    element.classList.remove(className);
+    void element.offsetWidth;
+    element.classList.add(className);
 }
 
 // Copy and Fill the blanks: show the passage letter by letter, ready to type.
@@ -569,6 +633,7 @@ function handleTyping() {
         if (cur.startTime === null && typeBox.value.length > 0) {
             startTimer();
         }
+        moveCar(typeBox.value.length / cur.target.length);
         return;
     }
 
@@ -583,6 +648,7 @@ function handleTyping() {
     }
     scoreNewCharacters(typed);
     paintLetters(typed);
+    moveCar(countCorrect(typed) / cur.target.length);
 
     if (typed === cur.target) {
         finishSection();
@@ -592,18 +658,37 @@ function handleTyping() {
 // Count keystrokes and errors, but only for characters beyond what was
 // there last time. Backspacing and retyping a letter counts as a new keystroke,
 // so a mistake that gets fixed still stays in the error count.
-// A mistake inside a blank also marks that blank as missed.
 function scoreNewCharacters(typed) {
     for (let i = cur.prevTyped.length; i < typed.length; i++) {
         cur.keystrokes++;
-        if (typed[i] !== cur.target[i]) {
-            cur.errors++;
-            if (cur.mask[i] !== -1) {
-                cur.missed.add(cur.mask[i]);
-            }
+        if (typed[i] === cur.target[i]) {
+            addToStreak();
+        } else {
+            recordMistake(i);
         }
     }
     cur.prevTyped = typed;
+}
+
+// One more correct letter in a row. Every 25, the streak counter pops.
+function addToStreak() {
+    cur.streak++;
+    streakStat.textContent = cur.streak;
+    if (cur.streak % 25 === 0) {
+        restartAnimation(streakBox, 'pop');
+    }
+}
+
+// A wrong letter at position i: count the error, mark its blank (if any)
+// as missed, reset the streak and give the passage a little shake.
+function recordMistake(i) {
+    cur.errors++;
+    if (cur.mask[i] !== -1) {
+        cur.missed.add(cur.mask[i]);
+    }
+    cur.streak = 0;
+    streakStat.textContent = 0;
+    restartAnimation(passage, 'shake');
 }
 
 // How many typed characters match the target in the same position.
@@ -852,6 +937,13 @@ function showResult(result) {
         showRecallResult(result);
     }
     resultNote.textContent = makeResultNote(result);
+    showStamp(result.score);
+    renderDots();
+
+    const newBest = checkPersonalBest(result.wpm);
+    if (result.score >= 90 || newBest) {
+        launchConfetti();
+    }
 
     if (pos === order.length - 1) {
         nextBtn.textContent = 'See summary';
@@ -859,6 +951,122 @@ function showResult(result) {
         nextBtn.textContent = 'Next section';
     }
     nextBtn.focus();
+}
+
+// Turn a score into a grade letter.
+function gradeFor(score) {
+    if (score >= 97) return 'S';
+    if (score >= 90) return 'A';
+    if (score >= 80) return 'B';
+    if (score >= 65) return 'C';
+    return 'D';
+}
+
+// Pick a random item from a list.
+function randomItem(list) {
+    return list[Math.floor(Math.random() * list.length)];
+}
+
+// Show the grade stamp (with its thump-down animation) and a matching title.
+function showStamp(score) {
+    const grade = gradeFor(score);
+    stampGrade.textContent = grade;
+    stamp.dataset.grade = grade;
+    resultTitle.textContent = randomItem(GRADE_TITLES[grade]);
+    restartAnimation(stamp, 'stamp-in');
+}
+
+// Compare a WPM with the saved best for this mode, save it if it's
+// higher, and write the personal-best note. Returns true only when an
+// existing best was beaten (the very first best isn't celebrated).
+function checkPersonalBest(wpm) {
+    const key = BEST_KEY_START + runMode;
+    const saved = loadSaved(key);
+    let best = 0;
+    if (saved !== null) {
+        best = Number(saved);
+    }
+
+    // nothing saved yet and 0 WPM (finished within 1.5 seconds): say nothing
+    if (best === 0 && wpm === 0) {
+        pbNote.textContent = '';
+        return false;
+    }
+    if (wpm <= best) {
+        pbNote.textContent = `Personal best: ${best} WPM`;
+        return false;
+    }
+    save(key, String(wpm));
+    if (best === 0) {
+        pbNote.textContent = `First personal best set: ${wpm} WPM`;
+        return false;
+    }
+    pbNote.textContent = `New personal best! ${wpm} WPM (was ${best})`;
+    return true;
+}
+
+// True if the user has asked their system for less motion.
+function prefersReducedMotion() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+// Read the highlighter colours from the CSS variables, so confetti
+// matches the current light or dark palette.
+function confettiColours() {
+    const styles = getComputedStyle(document.documentElement);
+    return ['--yellow', '--pink', '--blue'].map(name => styles.getPropertyValue(name).trim());
+}
+
+// One piece of confetti, starting somewhere above the top of the screen.
+function makeConfettiPiece(colours) {
+    return {
+        x: Math.random() * confettiCanvas.width,
+        y: -20 - Math.random() * confettiCanvas.height * 0.5,
+        speedX: (Math.random() - 0.5) * 4,
+        speedY: 2 + Math.random() * 4,
+        size: 6 + Math.random() * 6,
+        angle: Math.random() * Math.PI,
+        spin: (Math.random() - 0.5) * 0.3,
+        colour: randomItem(colours)
+    };
+}
+
+// Throw 120 pieces of confetti (unless reduced motion is on).
+function launchConfetti() {
+    if (prefersReducedMotion()) return;
+    confettiCanvas.width = window.innerWidth;
+    confettiCanvas.height = window.innerHeight;
+
+    const colours = confettiColours();
+    confettiPieces = [];
+    for (let k = 0; k < 120; k++) {
+        confettiPieces.push(makeConfettiPiece(colours));
+    }
+    confettiStart = performance.now();
+    requestAnimationFrame(drawConfetti);
+}
+
+// Draw one frame: move each piece, spin it, pull it down a little
+// (gravity), and ask for another frame until 2.5 seconds have passed.
+function drawConfetti(now) {
+    const context = confettiCanvas.getContext('2d');
+    context.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    if (now - confettiStart > 2500) return;
+
+    for (const piece of confettiPieces) {
+        piece.x += piece.speedX;
+        piece.y += piece.speedY;
+        piece.speedY += 0.05;
+        piece.angle += piece.spin;
+
+        context.save();
+        context.translate(piece.x, piece.y);
+        context.rotate(piece.angle);
+        context.fillStyle = piece.colour;
+        context.fillRect(-piece.size / 2, -piece.size / 4, piece.size, piece.size / 2);
+        context.restore();
+    }
+    requestAnimationFrame(drawConfetti);
 }
 
 // Fill in the Recall parts of the result panel: the numbers, the original

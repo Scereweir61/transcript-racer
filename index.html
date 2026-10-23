@@ -4,146 +4,206 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Transcript Racer</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&family=Nunito:wght@400;600;800&display=swap">
         <link rel="stylesheet" href="style.css">
         <script src="app.js" defer></script>
     </head>
-    <body>
-        <section id="setup">
-            <h2>setup</h2>
-            <textarea id="source" rows="8" cols="80" placeholder="Paste a transcript here..."></textarea>
-            <button id="sampleBtn">Load sample</button>
-            <button id="clearBtn">Clear</button>
-            <p id="summary"></p>
-            <label>
-                <input type="checkbox" id="fillers" checked>
-                Remove filler words (um, uh, erm)
-            </label>
-            <label>
-                Sentences per section
-                <select id="perSection">
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3" selected>3</option>
-                    <option value="4">4</option>
-                    <option value="6">6</option>
-                </select>
-            </label>
-            <fieldset id="modePicker">
-                <legend>Study mode</legend>
-                <label>
-                    <input type="radio" name="mode" value="copy" checked>
-                    Copy
-                    <small>Type the text exactly as you see it.</small>
-                </label>
-                <label>
-                    <input type="radio" name="mode" value="blanks">
-                    Fill the blanks
-                    <small>Key words are hidden. Type them from memory.</small>
-                </label>
-                <label>
-                    <input type="radio" name="mode" value="recall">
-                    Recall
-                    <small>Read it, it disappears, then type what you remember.</small>
-                </label>
-            </fieldset>
-            <div id="blanksOptions">
-                <label>
-                    How many blanks
-                    <select id="blankDensity">
-                        <option value="0.15">A few</option>
-                        <option value="0.3" selected>Some</option>
-                        <option value="0.5">Loads</option>
-                    </select>
-                </label>
-            </div>
-            <div id="recallOptions">
-                <label>
-                    Reading time before it hides
-                    <select id="readTime">
-                        <option value="auto" selected>Auto (based on length)</option>
-                        <option value="5">5 seconds</option>
-                        <option value="10">10 seconds</option>
-                        <option value="20">20 seconds</option>
-                        <option value="0">Until I'm ready</option>
-                    </select>
-                </label>
-            </div>
-            <h3>First section preview</h3>
-            <p id="preview"></p>
-            <button id="startBtn">Start</button>
-        </section>
-        <section id="play">
-            <h2>play</h2>
-            <button id="backBtn">Back</button>
-            <p id="sectionLabel"></p>
-            <div id="stats">
-                <span>WPM <strong id="wpmStat">0</strong></span>
-                <span id="accStatBox">Accuracy <strong id="accStat">100%</strong></span>
-                <span>Time <strong id="timeStat">0:00</strong></span>
-            </div>
-            <div id="typingArea">
-                <div id="studyBox">
-                    <div id="countdown">
-                        <div id="countdownFill"></div>
+    <body data-mode="copy">
+        <header class="site-header">
+            <h1 class="logo">Transcript <span class="logo-highlight">Racer</span></h1>
+            <p class="tagline">Type your lectures. Remember your lectures.</p>
+        </header>
+
+        <main>
+            <section id="setup">
+                <div class="setup-grid">
+                    <div class="card">
+                        <h2>1. Paste a transcript</h2>
+                        <textarea id="source" rows="12" placeholder="Paste YouTube captions, an .srt/.vtt file or your notes here..."></textarea>
+                        <div class="button-row">
+                            <button id="sampleBtn" class="btn btn-small">Load sample</button>
+                            <button id="clearBtn" class="btn btn-small btn-plain">Clear</button>
+                        </div>
+                        <p id="summary" class="muted"></p>
+                        <div class="option-row">
+                            <label class="check">
+                                <input type="checkbox" id="fillers" checked>
+                                Remove filler words (um, uh, erm)
+                            </label>
+                            <label>
+                                Sentences per section
+                                <select id="perSection">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3" selected>3</option>
+                                    <option value="4">4</option>
+                                    <option value="6">6</option>
+                                </select>
+                            </label>
+                        </div>
                     </div>
-                    <button id="readyBtn">I'm ready, hide it</button>
+
+                    <div class="card">
+                        <h2>2. Pick a mode</h2>
+                        <fieldset id="modePicker">
+                            <legend class="visually-hidden">Study mode</legend>
+                            <label class="mode-card" data-mode="copy">
+                                <input type="radio" name="mode" value="copy" checked>
+                                <span class="mode-name">Copy</span>
+                                <small>Type the text exactly as you see it.</small>
+                            </label>
+                            <label class="mode-card" data-mode="blanks">
+                                <input type="radio" name="mode" value="blanks">
+                                <span class="mode-name">Fill the blanks</span>
+                                <small>Key words are hidden. Type them from memory.</small>
+                            </label>
+                            <label class="mode-card" data-mode="recall">
+                                <input type="radio" name="mode" value="recall">
+                                <span class="mode-name">Recall</span>
+                                <small>Read it, it disappears, then type what you remember.</small>
+                            </label>
+                        </fieldset>
+                        <div id="blanksOptions" class="mode-options">
+                            <label>
+                                How many blanks
+                                <select id="blankDensity">
+                                    <option value="0.15">A few</option>
+                                    <option value="0.3" selected>Some</option>
+                                    <option value="0.5">Loads</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div id="recallOptions" class="mode-options">
+                            <label>
+                                Reading time before it hides
+                                <select id="readTime">
+                                    <option value="auto" selected>Auto (based on length)</option>
+                                    <option value="5">5 seconds</option>
+                                    <option value="10">10 seconds</option>
+                                    <option value="20">20 seconds</option>
+                                    <option value="0">Until I'm ready</option>
+                                </select>
+                            </label>
+                        </div>
+                        <h3>First section preview</h3>
+                        <p id="preview" class="preview"></p>
+                        <button id="startBtn" class="btn btn-big">Let's go &rarr;</button>
+                    </div>
                 </div>
-                <p id="passage"></p>
-                <p id="recallMsg"></p>
-                <textarea id="typeBox" rows="3" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Start typing..."></textarea>
-                <div id="recallButtons">
-                    <button id="checkBtn">Check</button>
-                    <button id="peekBtn">Peek</button>
+            </section>
+
+            <section id="play">
+                <div class="play-top">
+                    <button id="backBtn" class="btn btn-small btn-plain">&larr; Back</button>
+                    <p id="sectionLabel" class="section-label"></p>
+                    <div id="dots" class="dots" aria-hidden="true"></div>
                 </div>
-                <button id="restartBtn">Restart section</button>
-                <button id="skipBtn">Skip</button>
-                <button id="revealBtn">Reveal word (Tab)</button>
-            </div>
-            <div id="resultPanel" hidden>
-                <h3>Section done!</h3>
-                <div id="recallRows">
-                    <p>Recalled <strong id="resultRecalled"></strong></p>
-                    <p>Words <strong id="resultWords"></strong></p>
-                    <p>Peeks <strong id="resultPeeks"></strong></p>
+
+                <div id="track" class="track" aria-hidden="true">
+                    <div id="road" class="road">
+                        <svg id="car" class="car" viewBox="0 0 64 32" width="56" height="28">
+                            <path class="car-body" d="M4 22 L4 16 Q4 13 7 13 L18 13 L25 6 L42 6 L50 13 L57 13 Q60 13 60 16 L60 22 Z"/>
+                            <path class="car-window" d="M22 13 L27 9 L33 9 L33 13 Z M36 13 L36 9 L41 9 L46 13 Z"/>
+                            <circle class="car-wheel" cx="17" cy="23" r="5"/>
+                            <circle class="car-wheel" cx="47" cy="23" r="5"/>
+                        </svg>
+                    </div>
+                    <div class="flag"></div>
                 </div>
-                <p>WPM <strong id="resultWpm"></strong></p>
-                <p id="accRow">Accuracy <strong id="resultAcc"></strong></p>
-                <p id="blanksRow">Blanks recalled <strong id="resultBlanks"></strong></p>
-                <p>Time <strong id="resultTime"></strong></p>
-                <div id="diffBox">
-                    <h4>The original</h4>
-                    <p id="diffOriginal"></p>
-                    <h4>What you typed</h4>
-                    <p id="diffTyped"></p>
+
+                <div id="stats" class="stats">
+                    <span class="stat">WPM <strong id="wpmStat">0</strong></span>
+                    <span id="accStatBox" class="stat">Accuracy <strong id="accStat">100%</strong></span>
+                    <span class="stat">Time <strong id="timeStat">0:00</strong></span>
+                    <span id="streakBox" class="stat">Streak <strong id="streakStat">0</strong></span>
                 </div>
-                <p id="resultNote"></p>
-                <button id="nextBtn">Next section</button>
-                <button id="retryBtn">Try again</button>
-                <button id="endBtn">End session</button>
-            </div>
-        </section>
-        <section id="done">
-            <h2>done</h2>
-            <p>
-                Overall WPM <strong id="totalWpm"></strong>
-                Average score <strong id="totalScore"></strong>
-                Completed <strong id="totalDone"></strong>
-            </p>
-            <table id="resultsTable">
-                <thead>
-                    <tr>
-                        <th class="col-num">#</th>
-                        <th>Section</th>
-                        <th class="col-stat">WPM</th>
-                        <th class="col-stat">Score</th>
-                    </tr>
-                </thead>
-                <tbody id="resultsBody"></tbody>
-            </table>
-            <p id="noResults" hidden>No sections finished this time.</p>
-            <button id="weakestBtn">Practise weakest sections</button>
-            <button id="againBtn">Do it all again</button>
-            <button id="changeBtn">Change transcript or mode</button>
-        </section>
+
+                <div id="typingArea" class="card">
+                    <div id="studyBox" class="study-box">
+                        <div id="countdown" class="countdown">
+                            <div id="countdownFill" class="countdown-fill"></div>
+                        </div>
+                        <button id="readyBtn" class="btn btn-small">I'm ready, hide it</button>
+                    </div>
+                    <p id="passage" class="passage"></p>
+                    <p id="recallMsg" class="recall-msg"></p>
+                    <textarea id="typeBox" rows="3" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Start typing..."></textarea>
+                    <div class="button-row">
+                        <span id="recallButtons" class="button-group">
+                            <button id="checkBtn" class="btn btn-small">Check</button>
+                            <button id="peekBtn" class="btn btn-small btn-plain">Peek</button>
+                        </span>
+                        <button id="revealBtn" class="btn btn-small">Reveal word (Tab)</button>
+                        <button id="restartBtn" class="btn btn-small btn-plain">Restart</button>
+                        <button id="skipBtn" class="btn btn-small btn-plain">Skip</button>
+                    </div>
+                </div>
+
+                <div id="resultPanel" class="card result" hidden>
+                    <div class="result-head">
+                        <div id="stamp" class="stamp"><span id="stampGrade"></span></div>
+                        <div>
+                            <h3 id="resultTitle">Section done!</h3>
+                            <p id="pbNote" class="muted"></p>
+                        </div>
+                    </div>
+                    <div class="tiles">
+                        <div id="recallRows">
+                            <p class="tile">Recalled <strong id="resultRecalled"></strong></p>
+                            <p class="tile">Words <strong id="resultWords"></strong></p>
+                            <p class="tile">Peeks <strong id="resultPeeks"></strong></p>
+                        </div>
+                        <p class="tile">WPM <strong id="resultWpm"></strong></p>
+                        <p id="accRow" class="tile">Accuracy <strong id="resultAcc"></strong></p>
+                        <p id="blanksRow" class="tile">Blanks recalled <strong id="resultBlanks"></strong></p>
+                        <p class="tile">Time <strong id="resultTime"></strong></p>
+                    </div>
+                    <div id="diffBox" class="diff">
+                        <h4>The original</h4>
+                        <p id="diffOriginal"></p>
+                        <h4>What you typed</h4>
+                        <p id="diffTyped"></p>
+                    </div>
+                    <p id="resultNote" class="note"></p>
+                    <div class="button-row">
+                        <button id="nextBtn" class="btn">Next section</button>
+                        <button id="retryBtn" class="btn btn-plain">Run it back</button>
+                        <button id="endBtn" class="btn btn-plain">I'm done</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="done">
+                <div class="card">
+                    <h2>Session done!</h2>
+                    <div class="tiles">
+                        <p class="tile">Overall WPM <strong id="totalWpm"></strong></p>
+                        <p class="tile">Average score <strong id="totalScore"></strong></p>
+                        <p class="tile">Completed <strong id="totalDone"></strong></p>
+                    </div>
+                    <table id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th class="col-num">#</th>
+                                <th>Section</th>
+                                <th class="col-stat">WPM</th>
+                                <th class="col-stat">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsBody"></tbody>
+                    </table>
+                    <p id="noResults" class="muted" hidden>No sections finished this time. Skipping is allowed, but it doesn't count!</p>
+                    <div class="button-row">
+                        <button id="weakestBtn" class="btn">Drill my weakest bits</button>
+                        <button id="againBtn" class="btn btn-plain">Do it all again</button>
+                        <button id="changeBtn" class="btn btn-plain">Change transcript or mode</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
     </body>
 </html>

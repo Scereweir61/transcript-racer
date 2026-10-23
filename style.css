@@ -1,49 +1,569 @@
+/* ============================================================
+   TOKENS
+   Every colour lives here. Components only use var(--name),
+   so dark mode just swaps these values and nothing else.
+   ============================================================ */
 :root {
-    --untyped: #8a8a8a;
-    --ok: #1f7a3a;
-    --bad: #c62828;
-    --bad-bg: #fde0e0;
-    --accent: #2563eb;
-    --reveal-bg: #fff3a0;
+    /* paper and ink */
+    --paper: #fbf6ea;
+    --dot: #d8ccb4;
+    --card: #ffffff;
+    --field: #fffdf7;
+    --ink: #1d1b26;
+    --muted: #6b6578;
+    --line: #1d1b26;
+    --shadow: #1d1b26;
+
+    /* highlighters, with dark text on top of them */
+    --yellow: #ffd23f;
+    --pink: #ff7eb6;
+    --blue: #5cc8f2;
+    --on-highlight: #1d1b26;
+
+    /* typing feedback */
+    --untyped: #9b95a8;
+    --ok: #17803f;
+    --bad: #d7263d;
+    --bad-bg: #ffdce1;
+    --accent: #3b5bff;
+    --reveal-bg: #fff0a3;
+
+    /* the current mode's colour (changed by body[data-mode] below) */
+    --mode: var(--yellow);
+
+    /* fonts, each with fallbacks in case Google Fonts doesn't load */
+    --font-display: "Bricolage Grotesque", "Arial Black", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+
+    --radius: 16px;
+    --shadow-size: 6px;
 }
 
-/* a <section> with the hidden property must stay hidden, whatever else says */
+/* dark palette: same names, darker values */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --paper: #16141d;
+        --dot: #2f2a3d;
+        --card: #221f2c;
+        --field: #1b1923;
+        --ink: #f2ecdf;
+        --muted: #a9a2b8;
+        --line: #f2ecdf;
+        --shadow: #000000;
+
+        --yellow: #f5c84c;
+        --pink: #ff8cc0;
+        --blue: #6fd0f5;
+        --on-highlight: #1d1b26;
+
+        --untyped: #77708a;
+        --ok: #5fd68f;
+        --bad: #ff6b81;
+        --bad-bg: #4a1f2a;
+        --accent: #8fa2ff;
+        --reveal-bg: #5a4a12;
+    }
+}
+
+/* each mode gets its own highlighter colour */
+body[data-mode="copy"] {
+    --mode: var(--yellow);
+}
+
+body[data-mode="blanks"] {
+    --mode: var(--pink);
+}
+
+body[data-mode="recall"] {
+    --mode: var(--blue);
+}
+
+/* ============================================================
+   BASICS
+   ============================================================ */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+/* a hidden element must stay hidden, whatever display other rules set */
 [hidden] {
     display: none !important;
 }
 
-#passage {
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 1.25rem;
-    line-height: 1.8;
-    color: var(--untyped);
-    white-space: pre-wrap;
-    cursor: text;
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--ink);
+    background-color: var(--paper);
+    /* the notebook dot grid: one small dot repeated every 22px */
+    background-image: radial-gradient(var(--dot) 1.3px, transparent 1.5px);
+    background-size: 22px 22px;
 }
 
-#passage .ok {
+h1,
+h2,
+h3,
+h4 {
+    font-family: var(--font-display);
+    line-height: 1.15;
+    margin: 0 0 0.75rem;
+}
+
+h2 {
+    font-size: 1.4rem;
+}
+
+h3 {
+    font-size: 1.1rem;
+    margin-top: 1.25rem;
+}
+
+main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 16px 3rem;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+/* hides something visually but keeps it for screen readers */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.site-header {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.5rem 16px 1.25rem;
+}
+
+.logo {
+    font-size: clamp(2rem, 7vw, 3.25rem);
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.02em;
+}
+
+/* "Racer" sits on a tilted highlighter sticker */
+.logo-highlight {
+    display: inline-block;
+    color: var(--on-highlight);
+    background: var(--mode);
+    border: 2px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 3px 3px 0 var(--shadow);
+    padding: 0 0.2em;
+    transform: rotate(-2deg);
+}
+
+.tagline {
+    margin: 0.25rem 0 0;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+/* ============================================================
+   CARDS, BUTTONS AND FORM FIELDS
+   ============================================================ */
+.card {
+    background: var(--card);
+    border: 2px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-size) var(--shadow-size) 0 var(--shadow);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.btn {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--on-highlight);
+    background: var(--mode);
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 4px 4px 0 var(--shadow);
+    padding: 0.6rem 1.1rem;
+    cursor: pointer;
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0 var(--shadow);
+}
+
+/* pressing moves the button into its shadow, like a real key */
+.btn:active {
+    transform: translate(4px, 4px);
+    box-shadow: 0 0 0 var(--shadow);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 4px 4px 0 var(--shadow);
+}
+
+.btn-plain {
+    background: var(--card);
+    color: var(--ink);
+}
+
+.btn-small {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+}
+
+.btn-big {
+    display: block;
+    width: 100%;
+    font-size: 1.3rem;
+    padding: 0.8rem;
+    margin-top: 1rem;
+}
+
+/* a clear outline when using the keyboard, on anything focusable */
+:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+}
+
+.button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+textarea,
+select {
+    font: inherit;
+    color: var(--ink);
+    background: var(--field);
+    border: 2px solid var(--line);
+    border-radius: 10px;
+    padding: 0.5rem 0.65rem;
+}
+
+textarea {
+    display: block;
+    width: 100%;
+    resize: vertical;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: var(--accent);
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+/* ============================================================
+   SETUP SCREEN
+   ============================================================ */
+.setup-grid {
+    display: grid;
+    gap: 0 1.5rem;
+}
+
+/* two columns on wider screens, stacked on phones */
+@media (min-width: 800px) {
+    .setup-grid {
+        grid-template-columns: 1.2fr 1fr;
+        align-items: start;
+    }
+}
+
+.option-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    align-items: center;
+}
+
+.option-row label,
+.mode-options label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+}
+
+#modePicker {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.mode-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0 0.6rem;
+    align-items: center;
+    padding: 0.7rem 0.9rem;
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.mode-card small {
+    grid-column: 2;
+    color: var(--muted);
+}
+
+.mode-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.mode-card[data-mode="copy"] {
+    --card-mode: var(--yellow);
+}
+
+.mode-card[data-mode="blanks"] {
+    --card-mode: var(--pink);
+}
+
+.mode-card[data-mode="recall"] {
+    --card-mode: var(--blue);
+}
+
+.mode-card:hover {
+    transform: translate(-1px, -1px);
+}
+
+/* the ticked mode lights up in its own colour */
+.mode-card:has(input:checked) {
+    background: var(--card-mode);
+    color: var(--on-highlight);
+    box-shadow: 4px 4px 0 var(--shadow);
+}
+
+.mode-card:has(input:checked) small {
+    color: var(--on-highlight);
+}
+
+.mode-options {
+    margin-top: 0.9rem;
+}
+
+.preview {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    background: var(--field);
+    border: 2px dashed var(--line);
+    border-radius: 10px;
+    padding: 0.75rem;
+    margin: 0;
+}
+
+/* ============================================================
+   PLAY SCREEN
+   ============================================================ */
+.play-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.section-label {
+    font-family: var(--font-display);
+    font-weight: 700;
+    margin: 0;
+}
+
+/* progress dots, one per section */
+.dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.dot {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--line);
+    border-radius: 50%;
+    background: var(--card);
+}
+
+.dot.done {
+    background: var(--mode);
+}
+
+.dot.skipped {
+    background: var(--muted);
+}
+
+.dot.current {
+    box-shadow: 0 0 0 3px var(--accent);
+}
+
+/* the race track: a road the car drives along, then the flag */
+.track {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--card);
+    border: 2px solid var(--line);
+    border-radius: 999px;
+    box-shadow: 4px 4px 0 var(--shadow);
+    padding: 4px 12px;
+    margin-bottom: 1rem;
+}
+
+.road {
+    position: relative;
+    flex: 1;
+    height: 34px;
+    /* a dashed centre line */
+    background: repeating-linear-gradient(90deg, var(--untyped) 0 12px, transparent 12px 24px) center / 100% 2px no-repeat;
+}
+
+.car {
+    position: absolute;
+    top: 2px;
+    left: 0;
+    transition: left 0.2s ease-out, transform 0.2s ease-out;
+}
+
+.car-body {
+    fill: var(--mode);
+    stroke: var(--line);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+}
+
+.car-window {
+    fill: var(--card);
+    stroke: var(--line);
+    stroke-width: 1.5;
+}
+
+.car-wheel {
+    fill: var(--ink);
+    stroke: var(--card);
+    stroke-width: 2;
+}
+
+/* a chequered flag made from a repeating four-square pattern */
+.flag {
+    flex: none;
+    width: 28px;
+    height: 24px;
+    border: 2px solid var(--line);
+    border-radius: 4px;
+    background: conic-gradient(var(--ink) 25%, var(--card) 0 50%, var(--ink) 0 75%, var(--card) 0) 0 0 / 10px 10px;
+}
+
+/* live stats */
+.stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.stat {
+    background: var(--card);
+    border: 2px solid var(--line);
+    border-radius: 999px;
+    padding: 0.25rem 0.85rem;
+    font-weight: 600;
+}
+
+.stat strong {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    margin-left: 0.25rem;
+}
+
+/* the streak counter pops every 25 correct letters in a row */
+.stat.pop {
+    animation: pop 0.6s ease-out;
+}
+
+@keyframes pop {
+    0% {
+        transform: scale(1);
+    }
+    30% {
+        transform: scale(1.35) rotate(-4deg);
+        background: var(--mode);
+        color: var(--on-highlight);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* the passage */
+.passage {
+    font-family: var(--font-mono);
+    font-size: 1.3rem;
+    line-height: 1.9;
+    color: var(--untyped);
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    cursor: text;
+    margin: 0 0 1rem;
+}
+
+.passage .ok {
     color: var(--ok);
 }
 
 /* the background makes a wrongly typed space visible */
-#passage .bad {
+.passage .bad {
     color: var(--bad);
     background: var(--bad-bg);
+    border-radius: 3px;
 }
 
 /* a hidden word's underscores */
-#passage .blank {
+.passage .blank {
     color: var(--accent);
+    font-weight: 600;
 }
 
 /* a blank shown with Tab or "Reveal word" */
-#passage .revealed {
+.passage .revealed {
     background: var(--reveal-bg);
 }
 
 /* the caret: a thin line drawn on the left edge of the next letter.
    It only adds a shadow, so the letter keeps its grey colour. */
-#passage .cur {
+.passage .cur {
     box-shadow: inset 2px 0 0 var(--accent);
     animation: blink 1s steps(1) infinite;
 }
@@ -54,11 +574,206 @@
     }
 }
 
+/* a little shake when a wrong letter is typed */
+.passage.shake {
+    animation: shake 0.25s;
+}
+
+@keyframes shake {
+    25% {
+        transform: translateX(-4px);
+    }
+    75% {
+        transform: translateX(4px);
+    }
+}
+
+#typeBox {
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+}
+
+/* Recall: the reading-time bar drains from full to empty */
+.study-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.countdown {
+    flex: 1 1 200px;
+    height: 14px;
+    background: var(--paper);
+    border: 2px solid var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.countdown-fill {
+    height: 100%;
+    background: var(--mode);
+    transition: width 0.1s linear;
+}
+
+.recall-msg {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    text-align: center;
+    border: 2px dashed var(--line);
+    border-radius: 12px;
+    padding: 1.5rem 1rem;
+    margin: 0 0 1rem;
+}
+
+/* ============================================================
+   RESULT PANEL
+   ============================================================ */
+.result-head {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.result-head h3 {
+    font-size: 1.5rem;
+    margin: 0;
+}
+
+.result-head p {
+    margin: 0.25rem 0 0;
+}
+
+/* the grade stamp, slightly tilted like a real rubber stamp */
+.stamp {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 84px;
+    height: 84px;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 3rem;
+    color: var(--on-highlight);
+    background: var(--grade-colour, var(--mode));
+    border: 3px solid var(--line);
+    border-radius: 18px;
+    box-shadow: 4px 4px 0 var(--shadow);
+    transform: rotate(-10deg);
+}
+
+.stamp[data-grade="S"] {
+    --grade-colour: var(--pink);
+}
+
+.stamp[data-grade="A"] {
+    --grade-colour: var(--blue);
+}
+
+.stamp[data-grade="B"] {
+    --grade-colour: var(--yellow);
+}
+
+.stamp[data-grade="C"],
+.stamp[data-grade="D"] {
+    --grade-colour: var(--paper);
+    color: var(--ink);
+}
+
+.stamp.stamp-in {
+    animation: stamp-in 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+@keyframes stamp-in {
+    from {
+        opacity: 0;
+        transform: scale(2.2) rotate(-30deg);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) rotate(-10deg);
+    }
+}
+
+/* number tiles, used on the result panel and done screen */
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+/* let the Recall tiles sit in the same grid as the others */
+#recallRows {
+    display: contents;
+}
+
+.tile {
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    background: var(--field);
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.tile strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 1.7rem;
+    color: var(--ink);
+}
+
+/* Recall result: original words you got (green) and missed (red) */
+.diff p {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    background: var(--field);
+    border: 2px solid var(--line);
+    border-radius: 10px;
+    padding: 0.75rem;
+    overflow-wrap: break-word;
+}
+
+.diff .hit {
+    color: var(--ok);
+    font-weight: 600;
+}
+
+.diff .miss {
+    color: var(--bad);
+    text-decoration: line-through;
+}
+
+.note {
+    font-weight: 600;
+}
+
+/* ============================================================
+   DONE SCREEN
+   ============================================================ */
 /* fixed layout lets the snippet column shrink instead of stretching the table */
 #resultsTable {
     width: 100%;
     table-layout: fixed;
     border-collapse: collapse;
+    margin-bottom: 0.5rem;
+}
+
+#resultsTable th {
+    font-family: var(--font-display);
+    text-align: left;
+    border-bottom: 2px solid var(--line);
+    padding: 0.4rem 0.5rem;
+}
+
+#resultsTable td {
+    border-bottom: 1px dashed var(--untyped);
+    padding: 0.5rem;
 }
 
 #resultsTable .col-num {
@@ -66,7 +781,7 @@
 }
 
 #resultsTable .col-stat {
-    width: 7rem;
+    width: 7.5rem;
 }
 
 /* keep each snippet on one line and end it with "..." if it's too long */
@@ -77,37 +792,74 @@
 }
 
 .pill {
-    margin-left: 0.4rem;
+    display: inline-block;
+    margin-left: 0.35rem;
     padding: 0 0.5rem;
-    border-radius: 999px;
     font-size: 0.75rem;
-    color: var(--bad);
-    background: var(--bad-bg);
+    font-weight: 800;
+    color: var(--on-highlight);
+    background: var(--pink);
+    border: 2px solid var(--line);
+    border-radius: 999px;
 }
 
-/* Recall: the reading-time bar drains from full to empty */
-#countdown {
-    height: 0.5rem;
-    background: var(--bad-bg);
-}
-
-#countdownFill {
-    height: 100%;
-    background: var(--accent);
-}
-
-/* Recall result: original words you got (green) and missed (red) */
-#diffOriginal .hit {
-    color: var(--ok);
-}
-
-#diffOriginal .miss {
-    color: var(--bad);
-    text-decoration: line-through;
-}
-
-#typeBox {
+/* ============================================================
+   CONFETTI
+   ============================================================ */
+.confetti {
+    position: fixed;
+    inset: 0;
     width: 100%;
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 1rem;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* ============================================================
+   SMALL SCREENS
+   ============================================================ */
+@media (max-width: 600px) {
+    :root {
+        --shadow-size: 4px;
+    }
+
+    .card {
+        padding: 1rem;
+    }
+
+    .passage {
+        font-size: 1.1rem;
+    }
+
+    #resultsTable .col-num {
+        width: 2rem;
+    }
+
+    #resultsTable .col-stat {
+        width: 4.5rem;
+    }
+
+    .stamp {
+        width: 68px;
+        height: 68px;
+        font-size: 2.4rem;
+    }
+}
+
+/* ============================================================
+   REDUCED MOTION
+   Turn off every animation and transition (the caret stops
+   blinking but stays visible). The JavaScript skips confetti too.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    .confetti {
+        display: none;
+    }
 }

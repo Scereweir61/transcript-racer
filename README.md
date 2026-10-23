@@ -10,7 +10,7 @@ Input transcript then have to type up the transcripts in a typeracer style game,
 - [x] Session summary and saving: results table, weak pills, weakest-sections drill, transcript saved in localStorage, sample transcript
 - [x] Fill-the-blanks mode: mode picker, weighted-random blanks, Tab to reveal, blanks-recalled score
 - [x] Recall mode: read, it hides, type from memory; scored with longest common subsequence
-- [ ] Make it look good
+- [x] Make it look good: notebook look, light/dark themes, car and flag, streaks, grade stamps, confetti, personal bests
 - [ ] Ship it
 
 ## How it works so far

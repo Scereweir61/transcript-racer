@@ -206,3 +206,62 @@ The rule for each cell:
 **Why it beats "% of words that appear anywhere":** that simpler method ignores order. Typing *energy makes cell the* would score 100%, even though it's word salad. With LCS, the longest list of words in the same order in both is just 1 word, so it scores 25%. LCS rewards remembering what was said *and in what order*, which is what understanding a lecture needs, while still forgiving a missed or extra word here and there. Punctuation and capitals don't count against you because both texts go through `normaliseWord` first.
 
 The table has (original words + 1) × (typed words + 1) cells, so a 50-word section with a 50-word answer fills about 2,600 cells, which is instant.
+
+## Phase 10: Make it look good
+
+### What was added
+
+- **Notebook desk look:** a dot-grid background, 2px dark outlines, hard offset shadows (`box-shadow: 6px 6px 0`) and rounded cards.
+- **Highlighter palette:** yellow, pink and blue. Each mode has its own colour (Copy is yellow, Fill the blanks pink, Recall blue), used for buttons, the car, the logo sticker and the progress dots.
+- **Fonts** from Google Fonts: Bricolage Grotesque for headings, Nunito for body text and JetBrains Mono for the passage. Each has a fallback stack (e.g. `Consolas, "Courier New", monospace`), so the app still looks fine offline.
+- **Fun touches:** a car that drives to a chequered flag as you type, a streak counter that pops every 25 correct letters in a row, a shake on a mistake, progress dots, an S/A/B/C/D grade stamp with a random title, confetti, and a personal-best WPM per mode.
+- **Casual copy:** "Let's go →", "Run it back", "I'm done", "Drill my weakest bits", "Poof, it's gone!".
+- **Buttons** sink into their shadow when pressed (`:active` moves them 4px and removes the shadow). Anything focusable gets a thick outline with `:focus-visible`, which shows for keyboard users but not on mouse clicks.
+- **Responsive:** setup is two columns from 800px wide and stacked below that. I checked every screen in a 400px-wide frame and none of them scroll sideways.
+- **Reduced motion:** with `prefers-reduced-motion: reduce`, all animations and transitions are switched off (the caret stops blinking but stays visible) and confetti is skipped.
+
+### HTML changes
+
+The page now has a header with the logo, and each screen's content sits in `.card` boxes. Every id from earlier phases is unchanged, so the JavaScript only needed additions. Cards are `<div>`s, not `<section>`s, because `show()` treats every `<section>` as a screen. New elements: `#dots`, the `#track` with an inline SVG `#car` and a `.flag`, `#streakBox`, the `#stamp` with `#resultTitle` and `#pbNote`, and a full-screen `<canvas id="confetti">`.
+
+### The new functions
+
+- `handleModeChange()` now also sets `document.body.dataset.mode`, which writes `data-mode="blanks"` on `<body>`. The CSS rule `body[data-mode="blanks"] { --mode: var(--pink); }` then recolours everything that uses `var(--mode)`.
+- `renderDots()` draws one dot per section in the run: filled when finished, grey when skipped, with a ring around the current one.
+- `moveCar(fraction)` sets the car's `left` to a percentage of the road. It also shifts the car back by the same percentage of its own width (`translateX(-50%)` at halfway), so at 100% its front bumper stops exactly at the flag instead of driving off the end.
+- `restartAnimation(element, className)` replays a CSS animation. Removing a class and adding it straight back does nothing, because the browser only looks at the end result. Reading `element.offsetWidth` in between makes the browser lay out the page with the class removed, so adding it again counts as new.
+- `scoreNewCharacters` now calls `addToStreak()` for a correct letter and `recordMistake(i)` for a wrong one. `addToStreak` counts up and pops the counter every 25 (`streak % 25 === 0`). `recordMistake` holds the old error-counting code, and also resets the streak and shakes the passage.
+- `gradeFor(score)` gives S (97+), A (90+), B (80+), C (65+) or D. `showStamp(score)` shows the letter, picks a title with `randomItem(GRADE_TITLES[grade])` and plays the stamp animation.
+- `checkPersonalBest(wpm)` reads the best WPM for the current mode from `localStorage` (key `transcriptRacer.best.copy` and so on) and saves the new one if it's higher. It returns `true` only when an existing best was beaten, so your very first section doesn't throw confetti just for existing.
+- `launchConfetti()` returns straight away if `prefersReducedMotion()` is true. Otherwise it sizes the canvas to the window, makes 120 pieces (`makeConfettiPiece`) in the highlighter colours (`confettiColours()` reads them from the CSS variables, so dark mode gets the dark palette), and starts `drawConfetti`.
+- `drawConfetti(now)` clears the canvas, moves each piece, adds a little to its downward speed (gravity), spins it, draws it as a small rotated rectangle, and asks `requestAnimationFrame` for the next frame until 2.5 seconds have passed. Confetti fires for a score of 90%+ or a new personal best.
+
+### Explain it: CSS variables and dark mode
+
+A **CSS variable** (custom property) is a named value you define once and reuse:
+
+```css
+:root {
+    --ink: #1d1b26;
+}
+.card {
+    border: 2px solid var(--ink);
+}
+```
+
+`:root` means the `<html>` element, so variables set there are available everywhere. Every colour in `style.css` is a variable on `:root`, and component rules like `.card` or `.btn` only ever say `var(--something)`. They never contain a colour value themselves.
+
+**Dark mode** is one media query that gives the *same variable names* new values:
+
+```css
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ink: #f2ecdf;
+        --paper: #16141d;
+    }
+}
+```
+
+When the computer is set to dark mode, the browser uses the second set of values. Because `.card` still says `var(--ink)`, it picks up the dark value automatically. None of the component rules are written twice. Adding a new component means using the existing variables, and it works in both themes for free.
+
+The mode colours work the same way. `--mode` is a variable, and `body[data-mode="recall"]` sets it to `var(--blue)`. Variables pass down to child elements, so every button, dot and car inside the body turns blue.
