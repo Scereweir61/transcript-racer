@@ -105,3 +105,44 @@ The snippet column uses CSS to stay on one line: `white-space: nowrap` stops wra
 ### Explain it: why total characters ÷ total time is fairer than averaging WPMs
 
 Say you type a short 50-character section in 10 seconds (60 WPM) and a long 500-character section in 200 seconds (30 WPM). The average of the two WPMs is 45, but that treats a 10-second sprint as equal to over three minutes of typing. Overall you typed 550 characters in 210 seconds, which is (550 ÷ 5) ÷ 3.5 minutes ≈ 31 WPM. That's your real speed across the session. Adding up all the characters and all the time weights each section by how much typing it actually took, so short sections can't inflate the result.
+
+## Phase 8: Fill-the-blanks mode
+
+### What was added
+
+- **Setup screen:** a "Study mode" picker (radio buttons) with Copy and Fill the blanks. "How many blanks" (A few / Some / Loads) only shows when Fill the blanks is ticked. The chosen mode is saved in `localStorage`. Recall gets its radio button in Phase 9, once it works.
+- **Play screen:** in Fill the blanks, some key words are shown as `_` in the accent colour. As you type over a blank, your own letters appear (green if right, red if wrong, and a typed space shows as `·`). Tab or the "Reveal word" button reveals the next blank, highlighted.
+- **Result panel:** a "Blanks recalled x/y" row in Fill the blanks.
+
+### Refactor
+
+`letterClass` used to return one class name. Now a letter can have more than one (for example `blank cur`), so it builds a list and joins it with spaces. Letters also don't always show the target letter any more (a blank shows `_`), so a new `letterText` function decides the text, and `paintLetters` now sets both text and class. `renderPassage` just creates empty spans and leaves the filling-in to `paintLetters`. In Copy mode there are no blanks, so every letter takes the same path as before and behaves exactly as in Phase 5.
+
+### The new functions
+
+- `selectedMode()` returns the value of the ticked radio button.
+- `handleModeChange()` shows or hides the blanks options and saves the mode. `restoreMode()` ticks the saved mode at startup.
+- `findWords(text)` uses `matchAll` with `/[A-Za-z0-9][A-Za-z0-9'-]*/g` to find each word plus its `start` and `end` position. The pattern means "a letter or digit, then any mix of letters, digits, apostrophes and hyphens", so `thirty-two` and `we're` count as one word. A trailing `'` or `-` is removed.
+- `countCapitals(word)` and `isSpecial(word)`: a special word (2+ characters) has a digit or at least two capitals, like `ATP` or `FADH2`.
+- `isCandidate(word)`: special words always qualify. Other words need 6+ characters and must not be on the `STOP_WORDS` list (long but meaningless words like "because" or "actually"). Apostrophes are removed before the check, so "you're" is looked up as "youre".
+- `blankWeight(word)` is `(length + 5 if special)²`.
+- `pickBlanks(text, density)` picks `round(candidates × density)` words (at least 1) using weighted random, then sorts them back into text order.
+- `makeMask(length, blanks)` builds an array with one number per character: the blank's id, or `-1` for a normal character. This lets the code ask "is letter 37 part of a blank?" with just `cur.mask[37]`.
+- `revealNextBlank()` finds the first blank that isn't revealed and ends after the cursor (`end > cursor` means the cursor is inside it or before it). It reveals that blank and marks it as missed.
+- `scoreNewCharacters` now also marks a blank as missed when one of its letters is mistyped.
+- `scoreName()` gives the retry note the right words ("% blanks recalled" or "% accuracy").
+
+### Scoring
+
+A blank is **recalled** only if none of its letters were ever mistyped and it wasn't revealed. So `cur.missed` collects the id of any blank that was mistyped or revealed, and recalled = total blanks − missed. The score is recalled ÷ total as a percentage. If a section happens to have no candidate words at all, the score falls back to accuracy so the section still gets a fair number.
+
+### Explain it: how the weighted random choice works
+
+Take two candidates, **glycolysis** and **ATP**:
+
+- glycolysis has 10 letters and isn't special, so its weight is 10² = **100**.
+- ATP has 3 letters but is special (+5), so its weight is (3 + 5)² = **64**.
+
+Each word gets a "luck" number: `Math.random() × weight`. `Math.random()` is anywhere from 0 to 1, so glycolysis gets a random number between 0 and 100 and ATP gets one between 0 and 64. The words are sorted by luck, biggest first, and the top N become blanks.
+
+If we only need one blank, glycolysis wins most of the time because its range is bigger. ATP can still win, though: if glycolysis rolls 0.3 (luck 30) and ATP rolls 0.8 (luck 51.2), ATP is picked. So important-looking words are more likely to be hidden, but there's always some chance for the others, and every retry hides a different set. Squaring the length makes the gap bigger: a 10-letter word is only twice as long as a 5-letter one, but its weight is four times bigger (100 vs 25).

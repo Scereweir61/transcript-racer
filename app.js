@@ -33,9 +33,32 @@ const noResults = document.getElementById('noResults');
 const weakestBtn = document.getElementById('weakestBtn');
 const againBtn = document.getElementById('againBtn');
 const changeBtn = document.getElementById('changeBtn');
+const modePicker = document.getElementById('modePicker');
+const blanksOptions = document.getElementById('blanksOptions');
+const blankDensity = document.getElementById('blankDensity');
+const revealBtn = document.getElementById('revealBtn');
+const blanksRow = document.getElementById('blanksRow');
+const resultBlanks = document.getElementById('resultBlanks');
 
 // the names the app saves things under in localStorage
 const SOURCE_KEY = 'transcriptRacer.source';
+const MODE_KEY = 'transcriptRacer.mode';
+
+// common long words that make poor blanks, because they carry no meaning
+// (written without apostrophes, so "you're" is checked as "youre")
+const STOP_WORDS = new Set([
+    'about', 'above', 'after', 'again', 'against', 'along', 'also', 'among', 'around',
+    'because', 'been', 'before', 'being', 'below', 'between', 'both', 'could', 'does',
+    'doing', 'down', 'during', 'each', 'every', 'from', 'further', 'have', 'having',
+    'here', 'into', 'itself', 'just', 'more', 'most', 'much', 'other', 'ought', 'over',
+    'same', 'should', 'since', 'some', 'such', 'than', 'that', 'their', 'theirs', 'them',
+    'then', 'there', 'these', 'they', 'this', 'those', 'through', 'under', 'until', 'upon',
+    'very', 'were', 'what', 'when', 'where', 'which', 'while', 'will', 'with', 'would',
+    'your', 'yours', 'youre', 'theyre', 'thats', 'theres', 'people', 'really', 'thing',
+    'things', 'going', 'gonna', 'actually', 'basically', 'called', 'inside', 'within',
+    'without', 'another', 'something', 'first', 'second', 'third', 'fourth', 'places',
+    'takes', 'taking', 'makes', 'making', 'happens'
+]);
 
 // the example lecture used by "Load sample" and on a first visit
 const SAMPLE_TRANSCRIPT = `0:00
@@ -97,7 +120,7 @@ let previousAttempt = null;
 // results for this run, keyed by section number: { wpm, score, ms, chars, attempts }
 let results = {};
 
-// the study mode for this run (only 'copy' for now)
+// the study mode for this run: 'copy' or 'blanks'
 let runMode = 'copy';
 
 function show(view) {
@@ -187,10 +210,108 @@ function update() {
     startBtn.disabled = sections.length === 0;
 }
 
+// The mode whose radio button is ticked: 'copy' or 'blanks'.
+function selectedMode() {
+    return document.querySelector('input[name="mode"]:checked').value;
+}
+
+// Show only the options that belong to the ticked mode, and remember the choice.
+function handleModeChange() {
+    blanksOptions.hidden = selectedMode() !== 'blanks';
+    save(MODE_KEY, selectedMode());
+}
+
+// Tick the radio button for the saved mode, if there is one.
+function restoreMode() {
+    const saved = loadSaved(MODE_KEY);
+    const radio = document.querySelector(`input[name="mode"][value="${saved}"]`);
+    if (radio !== null) {
+        radio.checked = true;
+    }
+}
+
+// Find every word in the text, and where each one starts and ends.
+function findWords(text) {
+    const words = [];
+    // [A-Za-z0-9]      a word starts with a letter or a digit
+    // [A-Za-z0-9'-]*   then has any number of letters, digits, ' or -
+    const pattern = /[A-Za-z0-9][A-Za-z0-9'-]*/g;
+    for (const match of text.matchAll(pattern)) {
+        // drop a trailing ' or - (like in "students'"), it isn't part of the word
+        const word = match[0].replace(/['-]+$/, '');
+        words.push({ word: word, start: match.index, end: match.index + word.length });
+    }
+    return words;
+}
+
+// How many capital letters a word has.
+function countCapitals(word) {
+    const capitals = word.match(/[A-Z]/g);
+    if (capitals === null) return 0;
+    return capitals.length;
+}
+
+// A "special" word is a code or term like ATP, FADH2 or 1953:
+// it has a digit, or two or more capitals.
+function isSpecial(word) {
+    if (word.length < 2) return false;
+    return /\d/.test(word) || countCapitals(word) >= 2;
+}
+
+// Is this word worth turning into a blank? Special words always are.
+// Otherwise it needs 6+ characters and must not be in the stop list.
+function isCandidate(word) {
+    if (isSpecial(word)) return true;
+    if (word.length < 6) return false;
+    const plain = word.toLowerCase().replace(/'/g, '');
+    return !STOP_WORDS.has(plain);
+}
+
+// How strongly a word should be favoured as a blank. Longer words score
+// higher, special words get a +5 bonus, and squaring widens the gap.
+function blankWeight(word) {
+    let size = word.length;
+    if (isSpecial(word)) size += 5;
+    return size * size;
+}
+
+// Choose which words to hide. Returns [{ word, start, end }] in text order.
+// density is the share of candidates to pick, e.g. 0.3 for about 30%.
+function pickBlanks(text, density) {
+    const candidates = findWords(text).filter(w => isCandidate(w.word));
+    if (candidates.length === 0) return [];
+
+    const howMany = Math.max(1, Math.round(candidates.length * density));
+
+    // weighted random: each word gets a random number between 0 and its
+    // weight, and the biggest numbers win. Heavy words usually win, but
+    // not always, so every retry is different.
+    for (const candidate of candidates) {
+        candidate.luck = Math.random() * blankWeight(candidate.word);
+    }
+    candidates.sort((a, b) => b.luck - a.luck);
+
+    const chosen = candidates.slice(0, howMany);
+    return chosen.sort((a, b) => a.start - b.start);
+}
+
+// Make an array with one entry per character of the text: the id of the
+// blank that character belongs to, or -1 if it isn't part of a blank.
+function makeMask(length, blanks) {
+    const mask = new Array(length).fill(-1);
+    for (let id = 0; id < blanks.length; id++) {
+        for (let i = blanks[id].start; i < blanks[id].end; i++) {
+            mask[i] = id;
+        }
+    }
+    return mask;
+}
+
 // Start a run through the given section numbers, beginning with the first.
 function startRun(sectionNumbers) {
     order = sectionNumbers;
     pos = 0;
+    runMode = selectedMode();
     results = {};
     previousAttempt = null;
     show('play');
@@ -209,15 +330,25 @@ function startAll() {
 // Set up the section at position `pos` of the run, ready to be typed.
 function loadSection() {
     stopTimer();
+    const target = sections[order[pos]];
+    let blanks = [];
+    if (runMode === 'blanks') {
+        blanks = pickBlanks(target, Number(blankDensity.value));
+    }
+
     cur = {
         index: order[pos],
-        target: sections[order[pos]],
+        target: target,
         spans: [],
         prevTyped: '',     // what the box held before the latest input
         keystrokes: 0,     // new characters typed
         errors: 0,         // new characters that were wrong
         startTime: null,   // set on the first keystroke
-        endTime: null      // set when the section is finished
+        endTime: null,     // set when the section is finished
+        blanks: blanks,    // the hidden words (empty in Copy mode)
+        mask: makeMask(target.length, blanks),
+        revealed: new Set(),  // ids of blanks revealed with Tab
+        missed: new Set()     // ids of blanks mistyped or revealed
     };
     sectionLabel.textContent = `Section ${pos + 1} of ${order.length}`;
     renderPassage();
@@ -225,41 +356,83 @@ function loadSection() {
     typeBox.disabled = false;
     typingArea.hidden = false;
     resultPanel.hidden = true;
+    revealBtn.hidden = runMode !== 'blanks';
     paintLetters('');
     updateStats();
     typeBox.focus();
 }
 
-// Put the target text on screen as one <span> per character,
-// so each letter can be coloured on its own.
+// Put the passage on screen as one <span> per character, so each letter
+// can be coloured on its own. paintLetters fills in the letters.
 function renderPassage() {
     passage.textContent = '';
     cur.spans = [];
     for (let i = 0; i < cur.target.length; i++) {
         const span = document.createElement('span');
-        span.textContent = cur.target[i];
         passage.appendChild(span);
         cur.spans.push(span);
     }
 }
 
-// Work out the class for the letter at position i:
-// 'ok' if typed correctly, 'bad' if typed wrongly,
-// 'cur' if it's the next one to type, and '' (plain grey) if not reached yet.
-function letterClass(i, typed) {
+// Work out what to show for the letter at position i.
+// Normal letters always show the target letter. A blank shows what was
+// typed over it (a typed space as ·), the real letter once revealed, or _.
+function letterText(i, typed) {
+    const blankId = cur.mask[i];
+    if (blankId === -1) return cur.target[i];
     if (i < typed.length) {
-        if (typed[i] === cur.target[i]) return 'ok';
-        return 'bad';
+        if (typed[i] === ' ') return '·';
+        return typed[i];
     }
-    if (i === typed.length) return 'cur';
-    return '';
+    if (cur.revealed.has(blankId)) return cur.target[i];
+    return '_';
 }
 
-// Give every letter in the passage its class, based on what's been typed.
+// Work out the classes for the letter at position i:
+// 'ok' if typed correctly, 'bad' if typed wrongly,
+// 'cur' if it's the next one to type, and none (plain grey) if not reached yet.
+// Blanks also get 'blank' while hidden, or 'revealed' once revealed.
+function letterClass(i, typed) {
+    const classes = [];
+    const blankId = cur.mask[i];
+
+    if (i < typed.length) {
+        if (typed[i] === cur.target[i]) {
+            classes.push('ok');
+        } else {
+            classes.push('bad');
+        }
+    } else if (blankId !== -1 && !cur.revealed.has(blankId)) {
+        classes.push('blank');
+    }
+
+    if (blankId !== -1 && cur.revealed.has(blankId)) classes.push('revealed');
+    if (i === typed.length) classes.push('cur');
+    return classes.join(' ');
+}
+
+// Give every letter in the passage its text and classes, based on what's been typed.
 function paintLetters(typed) {
     for (let i = 0; i < cur.spans.length; i++) {
+        cur.spans[i].textContent = letterText(i, typed);
         cur.spans[i].className = letterClass(i, typed);
     }
+}
+
+// Reveal the next hidden blank at or after the cursor. A revealed
+// blank counts as missed.
+function revealNextBlank() {
+    const cursor = typeBox.value.length;
+    for (let id = 0; id < cur.blanks.length; id++) {
+        // end > cursor means the blank is under or after the cursor
+        if (cur.blanks[id].end > cursor && !cur.revealed.has(id)) {
+            cur.revealed.add(id);
+            cur.missed.add(id);
+            paintLetters(typeBox.value);
+            break;
+        }
+    }
+    typeBox.focus();
 }
 
 // Runs every time the typing box changes.
@@ -284,11 +457,15 @@ function handleTyping() {
 // Count keystrokes and errors, but only for characters beyond what was
 // there last time. Backspacing and retyping a letter counts as a new keystroke,
 // so a mistake that gets fixed still stays in the error count.
+// A mistake inside a blank also marks that blank as missed.
 function scoreNewCharacters(typed) {
     for (let i = cur.prevTyped.length; i < typed.length; i++) {
         cur.keystrokes++;
         if (typed[i] !== cur.target[i]) {
             cur.errors++;
+            if (cur.mask[i] !== -1) {
+                cur.missed.add(cur.mask[i]);
+            }
         }
     }
     cur.prevTyped = typed;
@@ -363,15 +540,31 @@ function finishSection() {
 
     const ms = elapsedMs();
     const accuracy = calcAccuracy();
+    const totalBlanks = cur.blanks.length;
+    const recalled = totalBlanks - cur.missed.size;
+
     lastResult = {
         wpm: calcWpm(cur.target.length, ms),
         accuracy: accuracy,
         score: accuracy,   // in Copy mode, the main score is accuracy
         ms: ms,
-        chars: cur.target.length
+        chars: cur.target.length,
+        recalled: recalled,
+        totalBlanks: totalBlanks
     };
+    // in Fill the blanks, the main score is the share of blanks recalled
+    // (a section with no blanks falls back to accuracy)
+    if (runMode === 'blanks' && totalBlanks > 0) {
+        lastResult.score = Math.round(recalled / totalBlanks * 100);
+    }
     recordResult(cur.index, lastResult);
     showResult(lastResult);
+}
+
+// What the main score measures in this mode, for the retry note.
+function scoreName() {
+    if (runMode === 'blanks') return '% blanks recalled';
+    return '% accuracy';
 }
 
 // Save a section's result for the summary. A retry replaces the old
@@ -397,6 +590,8 @@ function showResult(result) {
     resultWpm.textContent = result.wpm;
     resultAcc.textContent = result.accuracy + '%';
     resultTime.textContent = formatTime(result.ms);
+    blanksRow.hidden = runMode !== 'blanks';
+    resultBlanks.textContent = `${result.recalled}/${result.totalBlanks}`;
     resultNote.textContent = makeResultNote(result);
 
     if (pos === order.length - 1) {
@@ -413,8 +608,8 @@ function makeResultNote(result) {
     const notes = [];
     if (previousAttempt !== null) {
         const wpmChange = result.wpm - previousAttempt.wpm;
-        const accChange = result.accuracy - previousAttempt.accuracy;
-        notes.push(`Compared with last try: ${describeChange(wpmChange, ' WPM')}, ${describeChange(accChange, '% accuracy')}.`);
+        const scoreChange = result.score - previousAttempt.score;
+        notes.push(`Compared with last try: ${describeChange(wpmChange, ' WPM')}, ${describeChange(scoreChange, scoreName())}.`);
     }
     if (result.accuracy < 90) {
         notes.push('Accuracy was under 90%, so this one could use another go.');
@@ -615,9 +810,14 @@ function blockPaste(event) {
 }
 
 // Enter would add a new line, which never matches the target, so block it.
+// In Fill the blanks, Tab reveals the next blank instead of moving focus.
 function handleTypingKeys(event) {
     if (event.key === 'Enter') {
         event.preventDefault();
+    }
+    if (event.key === 'Tab' && runMode === 'blanks') {
+        event.preventDefault();
+        revealNextBlank();
     }
 }
 
@@ -646,7 +846,11 @@ clearBtn.addEventListener('click', () => {
 weakestBtn.addEventListener('click', () => startRun(weakestSections()));
 againBtn.addEventListener('click', startAll);
 changeBtn.addEventListener('click', () => show('setup'));
+modePicker.addEventListener('change', handleModeChange);
+revealBtn.addEventListener('click', revealNextBlank);
 
 restoreTranscript();
+restoreMode();
+handleModeChange();
 show('setup');
 update();

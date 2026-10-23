@@ -4,6 +4,7 @@
     --bad: #c62828;
     --bad-bg: #fde0e0;
     --accent: #2563eb;
+    --reveal-bg: #fff3a0;
 }
 
 /* a <section> with the hidden property must stay hidden, whatever else says */
@@ -28,6 +29,16 @@
 #passage .bad {
     color: var(--bad);
     background: var(--bad-bg);
+}
+
+/* a hidden word's underscores */
+#passage .blank {
+    color: var(--accent);
+}
+
+/* a blank shown with Tab or "Reveal word" */
+#passage .revealed {
+    background: var(--reveal-bg);
 }
 
 /* the caret: a thin line drawn on the left edge of the next letter.

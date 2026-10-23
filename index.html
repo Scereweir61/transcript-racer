@@ -28,6 +28,29 @@
                     <option value="6">6</option>
                 </select>
             </label>
+            <fieldset id="modePicker">
+                <legend>Study mode</legend>
+                <label>
+                    <input type="radio" name="mode" value="copy" checked>
+                    Copy
+                    <small>Type the text exactly as you see it.</small>
+                </label>
+                <label>
+                    <input type="radio" name="mode" value="blanks">
+                    Fill the blanks
+                    <small>Key words are hidden. Type them from memory.</small>
+                </label>
+            </fieldset>
+            <div id="blanksOptions">
+                <label>
+                    How many blanks
+                    <select id="blankDensity">
+                        <option value="0.15">A few</option>
+                        <option value="0.3" selected>Some</option>
+                        <option value="0.5">Loads</option>
+                    </select>
+                </label>
+            </div>
             <h3>First section preview</h3>
             <p id="preview"></p>
             <button id="startBtn">Start</button>
@@ -46,11 +69,13 @@
                 <textarea id="typeBox" rows="3" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Start typing..."></textarea>
                 <button id="restartBtn">Restart section</button>
                 <button id="skipBtn">Skip</button>
+                <button id="revealBtn">Reveal word (Tab)</button>
             </div>
             <div id="resultPanel" hidden>
                 <h3>Section done!</h3>
                 <p>WPM <strong id="resultWpm"></strong></p>
                 <p>Accuracy <strong id="resultAcc"></strong></p>
+                <p id="blanksRow">Blanks recalled <strong id="resultBlanks"></strong></p>
                 <p>Time <strong id="resultTime"></strong></p>
                 <p id="resultNote"></p>
                 <button id="nextBtn">Next section</button>
